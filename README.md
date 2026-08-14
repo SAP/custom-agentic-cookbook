@@ -1,4 +1,4 @@
-# SAP BTP Agent Cookbook
+# Custom Agentic Cookbook
 
 Customer-facing cookbook(recipes and skills) for building custom AI Agents on SAP BTP(Business Technology Platform) - across regular commercial regions, **China Landing**, **NS2 / SAP sovereign**, **KSA**, and other regulated deployments — before BAIP is generally available everywhere.
 
