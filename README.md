@@ -1,25 +1,28 @@
 # Custom Agentic Cookbook
 
-Customer-facing cookbook(recipes and skills) for building custom AI Agents on SAP BTP(Business Technology Platform) - across regular commercial regions, **China Landing**, **NS2 / SAP sovereign**, **KSA**, and other regulated deployments — before BAIP is generally available everywhere.
+Recipes and skills for building AI Agents on SAP Business AI Platform(BAIP) — in every region you operate, including sovereign and regulated deployments.
 
 ## Why this exists
 
-Official BTP path for AI Agent extensibility is **Joule BYOA + SAP AI Core / Generative AI Hub**. That path is GA (General Availability) today in `eu10` and rolling out across the regular commercial regions. It is **not** available in China Landing, NS2, or KSA non-regulated as of the most recent 2026-07-07 regional check. BAIP (Business AI Platform) consolidates this stack going forward; GA dates per region are not firm yet.
+SAP BTP is available in **China Landing**, **NS2 / SAP sovereign**, **KSA**, and every regulated region you operate in. Building AI Agents on it — while SAP's Business AI Platform(BAIP) continues its global rollout — takes knowing exactly which services your region exposes and how to wire them together correctly.
+
+This cookbook solves that precisely. Every recipe is built and tested against specific regional service availability. You get a working agent on the first try, in your region, without discovering gaps in production.
+
+When you're ready to move to SAP's full BAIP, the migration is an architectural upgrade: swap the model provider, keep everything else. The agent you build here is the same agent — running on the full stack.
 
 This cookbook unblocks customer teams **right now** with whatever services the target region exposes, and keeps interfaces clean enough to port to BAIP later.
 
 ## Developer experience
 
-The cookbook is built so you can go from an idea to a running, deployable agent by describing what you want in plain language — the coding agent does the wiring. What that gives you:
+Your developers shouldn't need to be BTP platform experts to build AI Agents that work. Describe what the agent should do — a skill-aware coding agent handles the rest. What your organisation gets:
 
-- **Prompt-driven scaffolding.** Describe your agent's purpose to a skill-aware coding agent (Claude Code, Cursor, Cline, Codex) and get a complete, runnable A2A project — system prompt, tools, and agent card tailored to that purpose. The prompt is the interface; there's no boilerplate to hand-write.
-- **Runs locally on day one — no cloud account.** The scaffold ships with mock data, so your agent converses and demos end-to-end on `localhost` before you touch BTP, entitlements, or regions. You build and test the agent's behavior first, and wire in a live backend only when you're ready.
-- **A guided, verifiable path.** Three checkpoints — scaffold → deploy (Cloud Foundry or Kyma) → register in Joule — each an independent milestone with a chat proof, so you always confirm the agent works before moving to the next step. Optional recipes (live data, RAG, knowledge graph, GitOps, observability) layer one capability at a time onto the same project.
-- **Composable, harness-agnostic skills.** Capability modules for AI Core, HANA vector/knowledge-graph retrieval, Joule capability bundles, and Kyma work with any coding agent that supports the skill format — reuse them across projects instead of relearning each service's setup.
-- **Portable by construction.** Model access sits behind a provider switch, transport uses the stable A2A protocol, and persistence swaps in-memory for HANA Cloud — so an agent built here moves to SAP's first-party platform (Joule BYOA + AI Core) later with minimal rework.
-- **Region-aware for regulated deployments.** Sovereign and regulated regions are first-class: availability guardrails are documented per recipe, so you learn what's supported in your target region up front rather than discovering it at deploy time.
+- **First working demo in hours, not weeks**. AI Agents run on localhost with mock data from day one — no BTP account, no entitlements, no infrastructure to provision before the idea can be tested.
+- **A delivery path with no hidden cliffs.** Three checkpoints — scaffold → deploy → register in Joule — each independently verified before the next begins. Teams always know where they stand.
+- **No expertise tax, harness-agnostic skills.** Skills encapsulate AI Core, HANA vector and knowledge-graph retrieval, Joule capability bundles, and Kyma. Teams that have never touched these services use them correctly from the start — and reuse the same skills across projects with any coding agent.
+- **Zero lock-in**. Model access, transport, and persistence are each independently swappable. Moving to SAP's first-party platform is a configuration change, not a project.
+- **Region-safe by design**. Sovereign and regulated region guardrails are baked into every recipe — no surprises at deploy time.
 
-The net effect: less time on plumbing and platform archaeology, more time on what your agent actually does.
+Teams ship working AI Agents in days. That time goes back into what the AI Agent actually does.
 
 ## Quickstart
 
@@ -84,9 +87,9 @@ Skills work with any coding agent that supports the skill format (Claude Code, C
 
 ## Positioning
 
-This cookbook is an **interim solution for teams building on BTP today**, particularly in regions where SAP's first-party agent platform (BAIP / Joule BYOA + AI Core) is not yet generally available.
+The official long-term path is **Joule BYOA + SAP AI Core / Generative AI Hub**. This cookbook is not a workaround — it is a deliberate bridge, built to serve teams today and designed to migrate cleanly to that platform as it arrives.
 
-The official long-term path is Joule BYOA + SAP AI Core / Generative AI Hub. This cookbook is designed with a clean layered architecture so agents built here can be ported to that platform later with minimal rework:
+Every architectural decision protects that promise:
 
 - **Model access** is isolated behind `LLM_PROVIDER` (`aicore` | `openai-compatible`) — swap the provider without touching agent logic
 - **Agent transport** uses A2A v0.3.0 — protocol-stable
