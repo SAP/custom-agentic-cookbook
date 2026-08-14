@@ -69,7 +69,7 @@ the harness from the target workspace so generated projects land there. See
 [`docs/harnesses.md`](../../docs/harnesses.md) for all supported harness
 configurations.
 
-**Shell scripts** (CI, air-gapped laptops, no LLM in the loop) — documented in [`SCRIPTS.md`](https://github.tools.sap/agent-assisted-coding/A2A-Agent-Toolkit-Plugin/blob/main/SCRIPTS.md):
+**Shell scripts** (CI, air-gapped laptops, no LLM in the loop) — documented in `SCRIPTS.md` (in the A2A Agent Toolkit plugin):
 
 ```bash
 bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/scaffold-ts.sh --help   # TypeScript

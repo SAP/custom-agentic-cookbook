@@ -12,7 +12,7 @@ Sources:
 - SAP BTP Cloud Foundry region docs: <https://help.sap.com/docs/btp/sap-business-technology-platform/regions-and-api-endpoints-available-for-cloud-foundry-environment>
 - SAP Data Privacy Integration Help Portal: <https://help.sap.com/docs/DATA_PRIVACY_INTEGRATION/>
 - SAP Document Management Service Help Portal: <https://help.sap.com/docs/DOCUMENT_MANAGEMENT/>
-- All-in on AI Decision: Agentic Memory Service: <https://github.tools.sap/CPA/landing-page-content/blob/main/40_Results/all-in-on-ai-decisions/agentic-memory-service.md>
+- All-in on AI Decision: Agentic Memory Service (internal SAP landing-page content)
 - Agent Memory Service - HANA Cloud Provisioning & Operational Responsibilities, attached Word document from the review thread.
 - SAP BTP Everywhere — Region Roadmap Planning: <https://url.sap/btp-dcroadmap> (forward-looking; pair with Discovery Center for current state)
 - SAP Cloud SDK for Python README and module guides: <https://github.com/SAP/cloud-sdk-python/tree/main>

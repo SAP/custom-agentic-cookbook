@@ -83,4 +83,3 @@ curl -s "$AICORE_BASE_URL/v2/lm/deployments/$AICORE_MODEL_DEPLOYMENT_ID" \
 
 - Bootstrap walkthrough: [`recipes/00-develop/00-region-preflight/`](../../recipes/00-develop/00-region-preflight/) for AI Core availability + entitlement check; [`recipes/optional/sovereign-model-gateway/`](../../recipes/optional/sovereign-model-gateway/) for the `openai-compatible` fallback when AI Core is not in-region.
 - [`sap-sovereign-regions`](../sap-sovereign-regions/SKILL.md) and its [`btp-regional-availability.md`](../sap-sovereign-regions/references/btp-regional-availability.md) reference — source-backed per-region service and model guardrails.
-- Upstream: `github.tools.sap/joule-demos/ai-core-onboarding-guide`

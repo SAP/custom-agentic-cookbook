@@ -54,7 +54,7 @@ bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/scaffold-ts.sh \
   --llm-provider openai-compatible
 ```
 
-Reference: [`SCRIPTS.md`](https://github.tools.sap/agent-assisted-coding/A2A-Agent-Toolkit-Plugin/blob/main/SCRIPTS.md).
+Reference: `SCRIPTS.md` (in the A2A Agent Toolkit plugin).
 
 The gateway must satisfy the contract in the [Contract](#contract) section below regardless of which driver you use.
 

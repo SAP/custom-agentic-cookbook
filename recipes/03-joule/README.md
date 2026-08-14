@@ -147,7 +147,7 @@ bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/create-destinatio
   --landscape <landscape>
 ```
 
-Reference: [`SCRIPTS.md` §6](https://github.tools.sap/agent-assisted-coding/A2A-Agent-Toolkit-Plugin/blob/main/SCRIPTS.md#6-reference-create-destinationsh).
+Reference: `SCRIPTS.md` §6 (in the A2A Agent Toolkit plugin).
 
 > ℹ `joule deploy` is **not** wrapped by any driver. Run it directly against `joule-capability/` — see the Deploy step below.
 
@@ -204,7 +204,7 @@ For UI work alongside this recipe, install these skills from <https://skills.clo
 ## Source
 
 - Discovery Center (Joule listing per region) — confirm with the [region preflight](../optional/region-preflight/).
-- [`skills/joule-a2a-agent/references/joule-capability.md`](https://github.tools.sap/agent-assisted-coding/A2A-Agent-Toolkit-Plugin/blob/main/skills/joule-a2a-agent/references/joule-capability.md) (in the A2A Agent Toolkit plugin)
+- `skills/joule-a2a-agent/references/joule-capability.md` (in the A2A Agent Toolkit plugin)
 
 ### Further reading
 

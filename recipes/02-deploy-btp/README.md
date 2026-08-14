@@ -143,7 +143,7 @@ the absolute `scripts/start-toolkit-mcp.sh` path. Setup:
 
 #### Standalone shell scripts
 
-The Python/MCP drivers don't wrap the full deploy as one command — run the underlying sequence (`cf push` / `helm install` → `create-destination.sh` → `joule deploy`). The script matrix and the manifest/APIRule templates the scripts emit are documented in [`SCRIPTS.md` §3](https://github.tools.sap/agent-assisted-coding/A2A-Agent-Toolkit-Plugin/blob/main/SCRIPTS.md#3-end-to-end-walkthrough); for Kyma, use the reusable Helm chart in [`references/kyma-deployment/`](../../references/kyma-deployment/) as the deployment wrapper.
+The Python/MCP drivers don't wrap the full deploy as one command — run the underlying sequence (`cf push` / `helm install` → `create-destination.sh` → `joule deploy`). The script matrix and the manifest/APIRule templates the scripts emit are documented in `SCRIPTS.md` §3 (in the A2A Agent Toolkit plugin); for Kyma, use the reusable Helm chart in [`references/kyma-deployment/`](../../references/kyma-deployment/) as the deployment wrapper.
 
 ## Verify it works
 
