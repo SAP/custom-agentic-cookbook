@@ -1,3 +1,6 @@
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP/custom-agentic-cookbook)](https://api.reuse.software/info/github.com/SAP/custom-agentic-cookbook)
+
+
 # Custom Agentic Cookbook
 
 Recipes and skills for building AI Agents on SAP Business AI Platform(BAIP) — in every region you operate, including sovereign and regulated deployments.
