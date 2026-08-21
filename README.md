@@ -66,6 +66,10 @@ Start at checkpoint 01 — no BTP account needed until checkpoint 02. The scaffo
 | [observe-and-eval](recipes/optional/observe-and-eval/) | Add structured logging, OTel middleware, and an eval harness |
 | [sap-cloud-logging](recipes/optional/sap-cloud-logging/) | Wire telemetry pipelines to SAP Cloud Logging (Kyma) |
 
+**Experimental sample:** [`samples/fde-a2a-minimal`](samples/fde-a2a-minimal/)
+is a credential-free Python A2A v1.0 protocol smoke. It is a supporting
+reference, not a replacement for the checkpoint-1 toolkit flow.
+
 ## Repository map
 
 ```
@@ -74,6 +78,9 @@ recipes/
   02-deploy-btp/            Checkpoint 2 — deploy to Cloud Foundry or Kyma
   03-joule/                 Checkpoint 3 — register agent inside Joule
   optional/                 Opt-in extras: live data, sovereign gateway, GitOps, BYO model, RAG, KG, observability, SAP Cloud Logging
+
+samples/
+  fde-a2a-minimal/          Experimental local Python A2A v1.0 protocol smoke
 
 skills/
   sap-ai-core/              Bootstrap AI Core, resource groups, deployments, OAuth2

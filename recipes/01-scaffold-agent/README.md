@@ -16,6 +16,11 @@ changes-under-baip: "The scaffolder's `--llm-provider` flag is the port-back bou
 
 Install the toolkit driver, scaffold *your* agent, run it locally, and talk to it. The generated tools return **mock data** (TODO-marked bodies tailored to your purpose), so the agent converses and demos end-to-end without touching any backend system. Everything in this checkpoint happens on your laptop — BTP, entitlements, and the region question all wait until [02-deploy-btp](../02-deploy-btp/); live business data is an opt-in via [optional/connect-data](../optional/connect-data/).
 
+For a credential-free look at the underlying protocol server without an LLM or
+generated business tools, see the experimental
+[`fde-a2a-minimal`](../../samples/fde-a2a-minimal/) Python A2A v1.0 smoke. It is
+supporting reference material and does not replace this checkpoint.
+
 ## 1. Local prerequisites
 
 | Tool | Version | Why |
