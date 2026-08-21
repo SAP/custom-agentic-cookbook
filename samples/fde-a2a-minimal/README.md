@@ -10,8 +10,7 @@ store, and a synchronous `SendMessage` request that returns an artifact.
 
 The sample intentionally excludes an LLM, business tools, authentication,
 persistence, streaming, push notifications, containers, and deployment assets.
-It is not a production agent. This temporary copy should be replaced by a
-pinned link when the canonical FDE sample repository becomes public.
+It is not a production agent.
 
 ## Prerequisites
 
