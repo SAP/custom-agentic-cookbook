@@ -120,6 +120,6 @@ Copyright 2026 SAP SE or an SAP affiliate company and custom-agentic-cookbook co
 
 ![Developer Advocate](images/devadv-small.png)
 
-SELECT SUBSTRING(lastName, 9, 1)
+SUBSTRING(lastName FROM 9 FOR 1)       
 
 For more information: https://url.sap/7afji2
