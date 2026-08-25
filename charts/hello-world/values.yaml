@@ -1,0 +1,29 @@
+image:
+  # Set both values at install time. Use an immutable tag, never latest.
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Names of existing image-pull Secrets in the release namespace.
+imagePullSecrets: []
+
+replicaCount: 1
+
+service:
+  port: 8000
+
+apirule:
+  # The service stays cluster-local unless this is explicitly enabled.
+  enabled: false
+  host: ""
+  gateway: kyma-system/kyma-gateway
+  # This chart supports noAuth only for deliberate development or smoke tests.
+  noAuth: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
