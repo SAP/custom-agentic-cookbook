@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         {{- include "hello-world.selectorLabels" . | nindent 8 }}
+        sidecar.istio.io/inject: "true"
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
