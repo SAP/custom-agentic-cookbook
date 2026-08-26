@@ -1,12 +1,14 @@
 image:
-  # Set both values at install time. Use an immutable tag, never latest.
+  # Set all three values at install time. The digest pins the image content.
   repository: ""
   tag: ""
+  digest: ""
   pullPolicy: IfNotPresent
 
 # Names of existing image-pull Secrets in the release namespace.
 imagePullSecrets: []
 
+# Task state is in memory, so this sample supports exactly one replica.
 replicaCount: 1
 
 service:

@@ -12,6 +12,7 @@
       "required": [
         "repository",
         "tag",
+        "digest",
         "pullPolicy"
       ],
       "properties": {
@@ -27,6 +28,10 @@
               "latest"
             ]
           }
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
         },
         "pullPolicy": {
           "type": "string",
@@ -47,7 +52,7 @@
     },
     "replicaCount": {
       "type": "integer",
-      "minimum": 1
+      "const": 1
     },
     "service": {
       "type": "object",

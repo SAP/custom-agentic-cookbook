@@ -77,8 +77,8 @@ uv run --frozen --group dev pytest
 
 ## Build and run the container
 
-Choose a registry-neutral image name and an immutable tag, such as a Git commit
-SHA:
+Choose a registry-neutral image name and a descriptive tag, such as a Git
+commit SHA:
 
 ```bash
 IMAGE_REPOSITORY=registry.example.com/team/fde-a2a-minimal
@@ -99,22 +99,30 @@ docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --tag "$IMAGE_REPOSITORY:$IMAGE_TAG" \
   --push .
+
+docker buildx imagetools inspect "$IMAGE_REPOSITORY:$IMAGE_TAG"
+IMAGE_DIGEST=sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
-Do not use `latest`; the chart rejects it so a deployment cannot silently move
-to a different image.
+Replace the example `IMAGE_DIGEST` with the top-level manifest digest printed
+by `imagetools inspect`. The chart requires this digest and renders
+`repository:tag@digest`, so the deployed image content cannot change even if
+someone later reuses the tag. The chart also rejects `latest` to keep the
+human-readable tag meaningful.
 
 ## Deploy with Helm
 
 The [`hello-world` chart](../../charts/hello-world/) keeps the service
-cluster-local by default. From this sample directory, install a public image
-with:
+cluster-local by default. It is fixed at one replica because task state is held
+in memory and is not shared between pods. From this sample directory, install
+a public image with:
 
 ```bash
 helm upgrade --install hello-world ../../charts/hello-world \
   --namespace fde-a2a-minimal --create-namespace \
   --set-string image.repository="$IMAGE_REPOSITORY" \
-  --set-string image.tag="$IMAGE_TAG"
+  --set-string image.tag="$IMAGE_TAG" \
+  --set-string image.digest="$IMAGE_DIGEST"
 ```
 
 For a private image, first create a `kubernetes.io/dockerconfigjson` Secret in
@@ -122,6 +130,8 @@ the target namespace from a registry-specific Docker configuration file. Keep
 that file and its credentials out of source control:
 
 ```bash
+kubectl create namespace fde-a2a-minimal
+
 kubectl --namespace fde-a2a-minimal create secret generic registry-credentials \
   --type=kubernetes.io/dockerconfigjson \
   --from-file=.dockerconfigjson=/path/to/registry-specific-config.json
@@ -130,8 +140,11 @@ helm upgrade --install hello-world ../../charts/hello-world \
   --namespace fde-a2a-minimal \
   --set-string image.repository="$IMAGE_REPOSITORY" \
   --set-string image.tag="$IMAGE_TAG" \
+  --set-string image.digest="$IMAGE_DIGEST" \
   --set-string 'imagePullSecrets[0]=registry-credentials'
 ```
+
+Skip the namespace creation command if the namespace already exists.
 
 The chart references existing pull Secrets by name and never accepts or
 creates registry credentials.
@@ -151,15 +164,13 @@ is used for this verification.
 
 ### Optional public development endpoint
 
-Kyma users can explicitly add an APIRule v2 endpoint:
+Kyma users can explicitly add an APIRule v2 endpoint to an existing release:
 
 ```bash
 PUBLIC_HOST=fde-a2a-minimal.example.com
 
-helm upgrade --install hello-world ../../charts/hello-world \
-  --namespace fde-a2a-minimal \
-  --set-string image.repository="$IMAGE_REPOSITORY" \
-  --set-string image.tag="$IMAGE_TAG" \
+helm upgrade hello-world ../../charts/hello-world \
+  --namespace fde-a2a-minimal --reuse-values \
   --set apirule.enabled=true \
   --set-string apirule.host="$PUBLIC_HOST" \
   --set apirule.noAuth=true

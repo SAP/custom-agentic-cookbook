@@ -30,10 +30,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "hello-world.image" -}}
 {{- $repository := required "image.repository is required" .Values.image.repository -}}
 {{- $tag := required "image.tag is required" .Values.image.tag -}}
+{{- $digest := required "image.digest is required" .Values.image.digest -}}
 {{- if eq $tag "latest" -}}
-{{- fail "image.tag must be immutable; latest is not allowed" -}}
+{{- fail "image.tag must not be latest" -}}
 {{- end -}}
-{{- printf "%s:%s" $repository $tag -}}
+{{- printf "%s:%s@%s" $repository $tag $digest -}}
 {{- end -}}
 
 {{- define "hello-world.url" -}}
