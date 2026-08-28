@@ -1,0 +1,7 @@
+{{- if .Values.apirule.enabled }}
+WARNING: This release exposes an unauthenticated development endpoint at:
+  {{ include "hello-world.url" . }}
+{{- else }}
+The service is cluster-local. To verify it from your workstation, run:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "hello-world.fullname" . }} 8000:{{ .Values.service.port }}
+{{- end }}

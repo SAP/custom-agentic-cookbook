@@ -67,8 +67,9 @@ Start at checkpoint 01 — no BTP account needed until checkpoint 02. The scaffo
 | [sap-cloud-logging](recipes/optional/sap-cloud-logging/) | Wire telemetry pipelines to SAP Cloud Logging (Kyma) |
 
 **Experimental sample:** [`samples/fde-a2a-minimal`](samples/fde-a2a-minimal/)
-is a credential-free Python A2A v1.0 protocol smoke. It is a supporting
-reference, not a replacement for the checkpoint-1 toolkit flow.
+is a credential-free Python A2A v1.0 protocol smoke with container and Kyma
+deployment assets. It is a supporting reference, not a replacement for the
+checkpoint-1 toolkit flow.
 
 ## Repository map
 
@@ -80,7 +81,7 @@ recipes/
   optional/                 Opt-in extras: live data, sovereign gateway, GitOps, BYO model, RAG, KG, observability, SAP Cloud Logging
 
 samples/
-  fde-a2a-minimal/          Experimental local Python A2A v1.0 protocol smoke
+  fde-a2a-minimal/          Experimental Python A2A v1.0 and Kyma smoke
 
 skills/
   sap-ai-core/              Bootstrap AI Core, resource groups, deployments, OAuth2

@@ -1,0 +1,31 @@
+image:
+  # Set all three values at install time. The digest pins the image content.
+  repository: ""
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# Names of existing image-pull Secrets in the release namespace.
+imagePullSecrets: []
+
+# Task state is in memory, so this sample supports exactly one replica.
+replicaCount: 1
+
+service:
+  port: 8000
+
+apirule:
+  # The service stays cluster-local unless this is explicitly enabled.
+  enabled: false
+  host: ""
+  gateway: kyma-system/kyma-gateway
+  # This chart supports noAuth only for deliberate development or smoke tests.
+  noAuth: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

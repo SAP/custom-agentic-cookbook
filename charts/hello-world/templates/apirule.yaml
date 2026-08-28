@@ -1,0 +1,26 @@
+{{- if .Values.apirule.enabled }}
+{{- $host := required "apirule.host is required when apirule.enabled=true" .Values.apirule.host }}
+{{- if not .Values.apirule.noAuth }}
+{{- fail "apirule.enabled=true requires explicit apirule.noAuth=true; this development chart does not configure production authentication" }}
+{{- end }}
+apiVersion: gateway.kyma-project.io/v2
+kind: APIRule
+metadata:
+  name: {{ include "hello-world.fullname" . }}
+  labels:
+    {{- include "hello-world.labels" . | nindent 4 }}
+spec:
+  gateway: {{ required "apirule.gateway is required when apirule.enabled=true" .Values.apirule.gateway | quote }}
+  hosts:
+    - {{ $host | quote }}
+  service:
+    name: {{ include "hello-world.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+    port: {{ .Values.service.port }}
+  rules:
+    - path: /{**}
+      methods:
+        - GET
+        - POST
+      noAuth: true
+{{- end }}
