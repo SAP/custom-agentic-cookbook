@@ -10,6 +10,17 @@ deployments.
 > This repository is under active development. Check the requirements and
 > validation status in each recipe before using it in a production landscape.
 
+## Why this Cookbook
+
+SAP BTP services and model availability vary by region, particularly in
+sovereign and regulated environments. This Cookbook provides a practical path
+from a local prototype to deployment on Cloud Foundry or Kyma and, where
+available, integration with Joule.
+
+Each recipe identifies its prerequisites, regional considerations, validation
+steps, and optional alternatives so teams can choose only the capabilities
+their environment supports.
+
 ## Get started
 
 Clone the Cookbook and begin with the first recipe:
