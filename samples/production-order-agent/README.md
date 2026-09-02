@@ -177,27 +177,25 @@ entitlement and instance in **BTP Cockpit → Services → Service Marketplace**
 then create a service key under the instance. Never commit or paste the service
 key into source files.
 
-Install the optional SDK and configure your local profile:
+Store the downloaded service-key JSON outside the repository with owner-only
+permissions, then install the optional SDK and configure your local profile
+directly from that file:
 
 ```bash
+chmod 600 /secure/path/aicore-service-key.json
 uv sync --frozen --group dev --extra aicore
 (
   set -e
   umask 077
-  uv run --frozen --extra aicore aicore configure
+  uv run --frozen --extra aicore aicore configure \
+    --service-key-json /secure/path/aicore-service-key.json
   chmod 600 ~/.aicore/config.json
 )
 ```
 
-Use these service-key fields when prompted:
-
-| `aicore configure` prompt | Service-key value |
-| --- | --- |
-| Auth URL | `url` plus `/oauth/token` |
-| Client ID | `clientid` |
-| Client secret | `clientsecret` |
-| Base URL | `serviceurls.AI_API_URL`, ending in `/v2` |
-| Resource group | The group containing the running model deployment |
+This avoids entering the client secret at an echoed terminal prompt. Delete the
+downloaded service-key file when it is no longer needed, following your
+organization's credential-retention policy.
 
 Select an available deployed model at runtime; the sample deliberately does
 not hardcode one:
