@@ -8,7 +8,7 @@ Only the **CoE-original `sap-*` skills** live here. For the general SAP-authored
 
 | Skill | Track | Triggers on |
 |---|---|---|
-| [`sap-ai-core`](sap-ai-core/SKILL.md) | Agent | Bootstrapping AI Core, resource groups, deployments, OAuth2 |
+| [`sap-ai-core`](sap-ai-core/SKILL.md) | Agent | AI Core service-key setup, resource/deployment checks, OAuth2, and model calls |
 | [`sap-hana-vector`](sap-hana-vector/SKILL.md) | RAG | HANA Cloud Vector retrieval (`REAL_VECTOR`, `VECTOR_EMBEDDING`) |
 | [`sap-hana-triple`](sap-hana-triple/SKILL.md) | KG | SPARQL 1.1 / triple store / Knowledge Graph on HANA Cloud |
 | [`sap-hana-data-prep`](sap-hana-data-prep/SKILL.md) | Data prep | Preprocess documents, CSV/Excel, JSON/API data, and business exports into HANA ingestion contracts and artifacts before vector/KG loading |
