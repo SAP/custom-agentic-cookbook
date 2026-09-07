@@ -53,15 +53,33 @@ def now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def strict_json(value: Any, *, compact: bool = False) -> str:
+    """Serialize rendered values as deterministic standards-compliant JSON."""
+    try:
+        if compact:
+            return json.dumps(
+                value,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        return json.dumps(value, allow_nan=False, indent=2, sort_keys=True)
+    except (TypeError, ValueError) as exc:
+        raise CookbookError(
+            "rendered inputs must contain only JSON-compatible values"
+        ) from exc
+
+
 def atomic_json(path: Path, value: Any) -> None:
     """Write private local state atomically with deterministic JSON formatting."""
+    serialized = strict_json(value)
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(
         prefix=f".{path.name}.", dir=str(path.parent)
     )
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2, sort_keys=True)
+            handle.write(serialized)
             handle.write("\n")
         os.chmod(temporary, 0o600)
         os.replace(temporary, path)
@@ -262,15 +280,34 @@ def normalize_manifest(source: dict[str, Any]) -> dict[str, Any]:
     if agent["llm_provider"] not in {"aicore", "openai-compatible"}:
         raise CookbookError("agent.llm_provider must be aicore or openai-compatible")
 
-    joule = require_mapping(manifest.setdefault("joule", {}), "joule")
-    joule.setdefault("enabled", False)
+    if "joule" not in manifest:
+        raise CookbookError(
+            "joule.enabled must be explicit; omission is not consent to a default"
+        )
+    joule = require_mapping(manifest["joule"], "joule")
+    if "enabled" not in joule:
+        raise CookbookError(
+            "joule.enabled must be explicit; omission is not consent to a default"
+        )
     if not isinstance(joule["enabled"], bool):
         raise CookbookError("joule.enabled must be true or false")
     if joule["enabled"]:
-        joule.setdefault("tenant_type", "PRODUCTIVE")
+        missing = [
+            f"joule.{key}"
+            for key in ("tenant_type", "include_process_automation")
+            if key not in joule
+        ]
+        if missing:
+            raise CookbookError(
+                "material Joule choices must be explicit; missing "
+                + ", ".join(missing)
+            )
         if joule["tenant_type"] not in {"PRODUCTIVE", "TEST"}:
             raise CookbookError("joule.tenant_type must be PRODUCTIVE or TEST")
-        joule.setdefault("include_process_automation", True)
+        if not isinstance(joule["include_process_automation"], bool):
+            raise CookbookError(
+                "joule.include_process_automation must be true or false"
+            )
         joule["users"] = text_list(joule.setdefault("users", []), "joule.users")
         joule["groups"] = text_list(joule.setdefault("groups", []), "joule.groups")
         joule.setdefault("identity_provider_origin", "sap.custom")
@@ -365,8 +402,8 @@ def render_tfvars(manifest: dict[str, Any]) -> dict[str, Any]:
                 "auto_scaler_max": autoscaler.get("max"),
                 "entitlement_amount": kyma["entitlement_amount"],
                 "plan_unique_identifier": kyma.get("plan_unique_identifier"),
-                "extra_parameters_json": json.dumps(
-                    kyma["parameters"], separators=(",", ":"), sort_keys=True
+                "extra_parameters_json": strict_json(
+                    kyma["parameters"], compact=True
                 ),
             }
         )
@@ -924,6 +961,7 @@ def command_status(manifest_path: Path, *, as_json: bool) -> int:
 
 def command_validate(manifest: dict[str, Any], manifest_path: Path) -> int:
     rendered = render_tfvars(manifest)
+    strict_json(rendered)
     print(f"Manifest validation passed: {manifest_path}")
     print(
         "Architecture: "
@@ -938,10 +976,11 @@ def command_validate(manifest: dict[str, Any], manifest_path: Path) -> int:
 
 def command_render(manifest: dict[str, Any], manifest_path: Path, stdout: bool) -> int:
     rendered = render_tfvars(manifest)
+    serialized = strict_json(rendered)
     atomic_json(GENERATED_TFVARS, rendered)
     record_stage(manifest_path, "render", "complete")
     if stdout:
-        print(json.dumps(rendered, indent=2, sort_keys=True))
+        print(serialized)
     else:
         print(f"Rendered inputs: {GENERATED_TFVARS}")
     return 0

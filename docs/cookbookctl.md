@@ -39,6 +39,10 @@ tokens, API keys, service keys, certificates, or private keys. `cookbookctl`
 rejects credential-shaped fields. Supply credentials only through the tools
 that eventually consume the reviewed configuration.
 
+Every manifest must explicitly set `joule.enabled`. When it is `true`, both
+`joule.tenant_type` and `joule.include_process_automation` are also required;
+the coordinator does not infer tenant or potentially billable service choices.
+
 The example uses A2A v1.0 terminology and the standard Agent Card path
 `/.well-known/agent-card.json`.
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import datetime as dt
 import importlib.util
 import io
 import json
@@ -83,6 +84,35 @@ class ManifestAndRenderTests(unittest.TestCase):
         with self.assertRaisesRegex(cookbookctl.CookbookError, "mutually exclusive"):
             cookbookctl.normalize_manifest(source)
 
+    def test_joule_enabled_choice_is_explicit(self) -> None:
+        for joule in (None, {}):
+            with self.subTest(joule=joule):
+                source = self.complete_manifest()
+                if joule is None:
+                    del source["joule"]
+                else:
+                    source["joule"] = joule
+
+                with self.assertRaisesRegex(
+                    cookbookctl.CookbookError, "joule.enabled must be explicit"
+                ):
+                    cookbookctl.normalize_manifest(source)
+
+    def test_enabled_joule_material_choices_are_explicit(self) -> None:
+        for joule, missing in (
+            (
+                {"enabled": True, "include_process_automation": False},
+                "joule.tenant_type",
+            ),
+            ({"enabled": True, "tenant_type": "TEST"}, "include_process_automation"),
+        ):
+            with self.subTest(missing=missing):
+                source = self.complete_manifest()
+                source["joule"] = joule
+
+                with self.assertRaisesRegex(cookbookctl.CookbookError, missing):
+                    cookbookctl.normalize_manifest(source)
+
     def test_manifest_rejects_embedded_credentials(self) -> None:
         source = self.complete_manifest()
         source["account"]["client_secret"] = (
@@ -132,6 +162,17 @@ class ManifestAndRenderTests(unittest.TestCase):
                 )
 
             self.assertFalse((root / ".cookbook").exists())
+
+    def test_validate_rejects_non_json_extension_values(self) -> None:
+        source = self.complete_manifest()
+        source["account"]["labels"] = {"reviewed-on": dt.date(2026, 9, 7)}
+        manifest = cookbookctl.normalize_manifest(source)
+
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            self.assertRaisesRegex(cookbookctl.CookbookError, "JSON-compatible"),
+        ):
+            cookbookctl.command_validate(manifest, Path("pilot.yaml"))
 
     def test_render_is_deterministic_and_records_local_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
