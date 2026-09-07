@@ -96,6 +96,9 @@ it can contain account identifiers.
 ./cookbookctl status --json
 ```
 
+If `pilot.yaml` exists but cannot be parsed or has no account mapping, these
+commands report it as present but invalid and preserve it for revision.
+
 One workspace has one active `pilot.yaml`. Park it before preparing another:
 
 ```bash

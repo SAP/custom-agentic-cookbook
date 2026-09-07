@@ -483,9 +483,14 @@ def btp_json(*arguments: str) -> Any:
 
 def subaccount_rows(payload: Any) -> list[dict[str, Any]]:
     """Normalize BTP CLI list output into a stable public JSON shape."""
-    items = payload.get("value", []) if isinstance(payload, dict) else payload
+    if isinstance(payload, list):
+        items = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("value"), list):
+        items = payload["value"]
+    else:
+        raise CookbookError("unexpected subaccount list response")
     rows = []
-    for item in items if isinstance(items, list) else []:
+    for item in items:
         if not isinstance(item, dict):
             continue
         rows.append(
@@ -503,17 +508,27 @@ def subaccount_rows(payload: Any) -> list[dict[str, Any]]:
 
 def manifest_account_summary(path: Path) -> dict[str, Any] | None:
     """Read only manifest account identifiers without creating local state."""
-    if yaml is None or not path.is_file():
+    if not path.exists():
         return None
+    invalid = {"path": str(path), "valid": False}
+    if yaml is None:
+        return {**invalid, "error": "PyYAML is required to inspect the manifest"}
+    if not path.is_file():
+        return {**invalid, "error": "manifest path is not a regular file"}
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        return None
+    except OSError:
+        return {**invalid, "error": "manifest could not be read"}
+    except yaml.YAMLError:
+        return {**invalid, "error": "manifest contains invalid YAML"}
+    if not isinstance(data, dict):
+        return {**invalid, "error": "manifest must be a YAML mapping"}
     account = data.get("account") if isinstance(data, dict) else None
     if not isinstance(account, dict):
-        return None
+        return {**invalid, "error": "manifest.account must be a YAML mapping"}
     return {
         "path": str(path),
+        "valid": True,
         "subdomain": account.get("subdomain"),
         "global_account_subdomain": account.get("global_account_subdomain"),
         "region": account.get("region"),
@@ -557,7 +572,9 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
 
     session_subdomain = str(global_account.get("subdomain") or "")
     subaccounts = btp_json("list", "accounts/subaccount")
-    if not isinstance(subaccounts, (dict, list)):
+    try:
+        rows = subaccount_rows(subaccounts)
+    except CookbookError:
         message = "could not list subaccounts from the active BTP CLI session"
         report = {
             "logged_in": True,
@@ -573,13 +590,17 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
             print(f"Error: {message}", file=sys.stderr)
         return 1
 
-    rows = subaccount_rows(subaccounts)
     active = manifest_account_summary(manifest_path)
     guidance = [
         "Discovery is read-only: cookbookctl does not select, adopt, or change a subaccount."
     ]
     manifest_report: dict[str, Any] = {"exists": False, "path": str(manifest_path)}
-    if active:
+    if active and not active["valid"]:
+        manifest_report = {"exists": True, **active}
+        guidance.append(
+            "The manifest exists but is invalid; revise it before using its account selection."
+        )
+    elif active:
         expected_global = active.get("global_account_subdomain")
         if expected_global and expected_global != session_subdomain:
             assessment = "wrong-global-account"
@@ -839,6 +860,13 @@ def active_pilot_report(manifest_path: Path) -> dict[str, Any]:
     summary = manifest_account_summary(manifest_path)
     if not summary:
         return {"exists": False, "path": str(manifest_path)}
+    if not summary["valid"]:
+        return {
+            "exists": True,
+            **summary,
+            "state_matches_manifest": False,
+            "stages": {},
+        }
     state, matches = read_state(manifest_path)
     stages = {}
     if state is not None and matches:
@@ -887,11 +915,19 @@ def command_pilots(manifest_path: Path, *, as_json: bool) -> int:
     active = active_pilot_report(manifest_path)
     parked = parked_pilot_reports()
     if active["exists"]:
-        guidance = [
-            "Resume or revise the active pilot, or park it before starting another local pilot."
-        ]
-        if not active["state_matches_manifest"]:
-            guidance.append("The saved state is absent or does not match the manifest.")
+        if not active["valid"]:
+            guidance = [
+                "The active manifest exists but is invalid; revise it before resuming, "
+                "parking, or replacing it."
+            ]
+        else:
+            guidance = [
+                "Resume or revise the active pilot, or park it before starting another local pilot."
+            ]
+            if not active["state_matches_manifest"]:
+                guidance.append(
+                    "The saved state is absent or does not match the manifest."
+                )
     elif parked:
         guidance = [
             "Start fresh or restore a parked pilot with './cookbookctl unpark <path>'."
@@ -905,11 +941,16 @@ def command_pilots(manifest_path: Path, *, as_json: bool) -> int:
 
     print("Local pilot state")
     if active["exists"]:
-        stages = (
-            ", ".join(f"{name} {status}" for name, status in active["stages"].items())
-            or "no matching recorded stages"
-        )
-        print(f"  Active: {active['path']} ({active.get('subdomain')}); {stages}")
+        if active["valid"]:
+            stages = (
+                ", ".join(
+                    f"{name} {status}" for name, status in active["stages"].items()
+                )
+                or "no matching recorded stages"
+            )
+            print(f"  Active: {active['path']} ({active.get('subdomain')}); {stages}")
+        else:
+            print(f"  Active: invalid ({active['path']}); {active['error']}")
     else:
         print(f"  Active: none ({active['path']} does not exist)")
     if parked:
@@ -930,6 +971,8 @@ def command_status(manifest_path: Path, *, as_json: bool) -> int:
     """Report manifest, state, and rendered-file status without writing."""
     active = active_pilot_report(manifest_path)
     state, matches = read_state(manifest_path)
+    if active["exists"] and not active["valid"]:
+        matches = False
     report = {
         "manifest": active,
         "state": {
@@ -948,9 +991,13 @@ def command_status(manifest_path: Path, *, as_json: bool) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     print("Cookbook coordinator status")
-    print(
-        f"  Manifest: {'present' if active['exists'] else 'missing'} ({manifest_path})"
-    )
+    if not active["exists"]:
+        manifest_status = "missing"
+    elif active["valid"]:
+        manifest_status = "present"
+    else:
+        manifest_status = "invalid"
+    print(f"  Manifest: {manifest_status} ({manifest_path})")
     print(f"  State: {'matching' if matches else 'missing or stale'} ({STATE_FILE})")
     print(
         f"  Rendered inputs: {'present' if GENERATED_TFVARS.is_file() else 'missing'} "
