@@ -31,15 +31,15 @@ GENERATED_TFVARS = STATE_DIR / "generated.tfvars.json"
 LOCAL_STATE_FILES = ("state.json", "generated.tfvars.json")
 
 _SECRET_KEYS = {
-    "api_key",
     "apikey",
+    "accesstoken",
     "certificate",
-    "client_secret",
+    "clientsecret",
     "credentials",
     "password",
     "passwd",
-    "private_key",
-    "service_key",
+    "privatekey",
+    "servicekey",
     "secret",
     "token",
 }
@@ -104,7 +104,7 @@ def reject_embedded_credentials(value: Any, path: str = "manifest") -> None:
     """Keep the portable manifest credential-free, including extension maps."""
     if isinstance(value, dict):
         for key, nested in value.items():
-            normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+            normalized = re.sub(r"[^a-z0-9]+", "", str(key).lower())
             if normalized in _SECRET_KEYS:
                 raise CookbookError(
                     f"{path}.{key} is not allowed; pilot manifests must be credential-free"
@@ -629,6 +629,8 @@ def read_state(manifest_path: Path) -> tuple[dict[str, Any] | None, bool]:
 
 def managed_parked_root(*, create: bool) -> Path:
     """Resolve the allowlisted archive root and reject a redirected child path."""
+    if STATE_DIR.is_symlink():
+        raise CookbookError("managed .cookbook state root must not be a symbolic link")
     state_root = STATE_DIR.resolve()
     parked_path = STATE_DIR / "parked"
     if parked_path.is_symlink():

@@ -92,6 +92,29 @@ class ManifestAndRenderTests(unittest.TestCase):
         with self.assertRaisesRegex(cookbookctl.CookbookError, "credential-free"):
             cookbookctl.normalize_manifest(source)
 
+    def test_manifest_rejects_common_credential_key_spellings(self) -> None:
+        for key in (
+            "clientsecret",
+            "clientSecret",
+            "serviceKey",
+            "privateKey",
+            "accessToken",
+        ):
+            with self.subTest(key=key):
+                source = self.complete_manifest()
+                source["services"] = {
+                    "cf_instances": {
+                        "example": {
+                            key: "synthetic-sensitive-value",  # pragma: allowlist secret
+                        }
+                    }
+                }
+
+                with self.assertRaisesRegex(
+                    cookbookctl.CookbookError, "credential-free"
+                ):
+                    cookbookctl.normalize_manifest(source)
+
     def test_validate_is_state_free(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -408,6 +431,25 @@ class LocalPilotLifecycleTests(unittest.TestCase):
                 cookbookctl.command_unpark(archive, manifest_path)
 
             self.assertTrue((archive / "pilot.yaml").is_file())
+
+    def test_park_rejects_a_symbolic_link_state_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            outside = root / "outside-state"
+            outside.mkdir()
+            state_dir.symlink_to(outside, target_is_directory=True)
+            manifest_path = root / "pilot.yaml"
+            self.write_example_manifest(manifest_path)
+
+            with (
+                self.patched_state(state_dir),
+                self.assertRaisesRegex(cookbookctl.CookbookError, "symbolic link"),
+            ):
+                cookbookctl.command_park(manifest_path)
+
+            self.assertTrue(manifest_path.is_file())
+            self.assertEqual(list(outside.iterdir()), [])
 
     def test_unpark_rejects_an_archive_outside_the_managed_parked_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
