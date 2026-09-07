@@ -426,12 +426,16 @@ def btp_json(*arguments: str) -> Any:
     """Run one of the coordinator's fixed read-only BTP CLI queries."""
     if not command_exists("btp"):
         return None
-    result = subprocess.run(
-        ["btp", "--format", "json", *arguments],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["btp", "--format", "json", *arguments],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
     if result.returncode != 0:
         return None
     try:
@@ -514,9 +518,26 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
             print(f"Error: {message}", file=sys.stderr)
         return 1
 
-    rows = subaccount_rows(btp_json("list", "accounts/subaccount"))
-    active = manifest_account_summary(manifest_path)
     session_subdomain = str(global_account.get("subdomain") or "")
+    subaccounts = btp_json("list", "accounts/subaccount")
+    if not isinstance(subaccounts, (dict, list)):
+        message = "could not list subaccounts from the active BTP CLI session"
+        report = {
+            "logged_in": True,
+            "global_account": {
+                "display_name": global_account.get("displayName"),
+                "subdomain": session_subdomain,
+            },
+            "error": message,
+        }
+        if as_json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(f"Error: {message}", file=sys.stderr)
+        return 1
+
+    rows = subaccount_rows(subaccounts)
+    active = manifest_account_summary(manifest_path)
     guidance = [
         "Discovery is read-only: cookbookctl does not select, adopt, or change a subaccount."
     ]
@@ -597,9 +618,12 @@ def read_state(manifest_path: Path) -> tuple[dict[str, Any] | None, bool]:
         return None, False
     if not isinstance(state, dict):
         return None, False
-    matches = manifest_path.is_file() and state.get(
-        "manifest_sha256"
-    ) == manifest_digest(manifest_path)
+    matches = (
+        state.get("version") == 1
+        and isinstance(state.get("stages"), dict)
+        and manifest_path.is_file()
+        and state.get("manifest_sha256") == manifest_digest(manifest_path)
+    )
     return state, matches
 
 

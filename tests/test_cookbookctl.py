@@ -297,6 +297,29 @@ class AccountDiscoveryTests(unittest.TestCase):
         self.assertFalse(report["logged_in"])
         self.assertIn("btp login --sso", report["error"])
 
+    def test_accounts_json_reports_subaccount_query_failure(self) -> None:
+        def incomplete_probe(*arguments: str):
+            if arguments == ("get", "accounts/global-account"):
+                return {
+                    "displayName": "Example Global Account",
+                    "subdomain": "example-global",
+                }
+            return None
+
+        with (
+            mock.patch.object(cookbookctl, "command_exists", return_value=True),
+            mock.patch.object(cookbookctl, "btp_json", side_effect=incomplete_probe),
+            contextlib.redirect_stdout(io.StringIO()) as captured,
+        ):
+            code = cookbookctl.command_accounts(
+                Path("/nonexistent/pilot.yaml"), as_json=True
+            )
+
+        report = json.loads(captured.getvalue())
+        self.assertEqual(code, 1)
+        self.assertTrue(report["logged_in"])
+        self.assertIn("could not list", report["error"])
+
 
 class LocalPilotLifecycleTests(unittest.TestCase):
     def state_patches(self, state_dir: Path):
@@ -464,6 +487,37 @@ class LocalPilotLifecycleTests(unittest.TestCase):
             self.assertFalse(report["manifest"]["exists"])
             self.assertFalse(report["state"]["exists"])
             self.assertFalse(state_dir.exists())
+
+    def test_status_treats_malformed_matching_state_as_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            state_dir.mkdir()
+            manifest_path = root / "pilot.yaml"
+            self.write_example_manifest(manifest_path)
+            malformed = {
+                "version": 1,
+                "manifest_sha256": cookbookctl.manifest_digest(manifest_path),
+                "stages": [],
+            }
+            state_file = state_dir / "state.json"
+            state_file.write_text(json.dumps(malformed), encoding="utf-8")
+
+            with (
+                self.patched_state(state_dir),
+                contextlib.redirect_stdout(io.StringIO()) as captured,
+            ):
+                self.assertEqual(
+                    cookbookctl.command_status(manifest_path, as_json=True),
+                    0,
+                )
+
+            report = json.loads(captured.getvalue())
+            self.assertTrue(report["state"]["exists"])
+            self.assertFalse(report["state"]["matches_manifest"])
+            self.assertEqual(
+                json.loads(state_file.read_text(encoding="utf-8")), malformed
+            )
 
     def test_cli_exposes_only_the_approved_commands(self) -> None:
         coordinator_parser = cookbookctl.parser()
