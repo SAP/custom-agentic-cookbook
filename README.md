@@ -41,6 +41,25 @@ Follow the core path in order:
 Checkpoint 1 uses mock data and does not require an SAP BTP account. For the
 complete flow and its dependencies, see the [recipe guide](recipes/README.md).
 
+### Prepare a local pilot manifest
+
+The standalone [`cookbookctl`](docs/cookbookctl.md) coordinator validates and
+renders a credential-free version-1 pilot manifest before any provisioning
+workflow is introduced:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements-cookbookctl.txt
+cp pilot.yaml.example pilot.yaml
+./cookbookctl validate
+./cookbookctl render --stdout
+```
+
+This coordinator core does not provision, adopt, deploy, register, verify, or
+destroy SAP BTP resources. Its only live query is read-only account discovery
+through `./cookbookctl accounts --json`.
+
 ### Install the agent skills
 
 The skills follow the [Agent Skills](https://agentskills.io/) format. Install
