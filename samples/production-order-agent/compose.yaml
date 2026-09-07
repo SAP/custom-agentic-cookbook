@@ -1,0 +1,31 @@
+services:
+  mcp:
+    build: .
+    command: ["python", "-m", "production_order_agent.mcp_server"]
+    environment:
+      DATA_MODE: ${DATA_MODE:-mock}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8090
+      S4_BASE_URL: ${S4_BASE_URL:-https://sandbox.api.sap.com/s4hanacloud/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV}
+      S4_API_KEY: ${S4_API_KEY:-}
+    ports:
+      - "127.0.0.1:8090:8090"
+
+  agent:
+    build: .
+    depends_on:
+      - mcp
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      URL: http://localhost:8000
+      MCP_SERVER_URL: http://mcp:8090/sse
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      MODEL_NAME: ${MODEL_NAME:-}
+      AICORE_AUTH_URL: ${AICORE_AUTH_URL:-}
+      AICORE_CLIENT_ID: ${AICORE_CLIENT_ID:-}
+      AICORE_CLIENT_SECRET: ${AICORE_CLIENT_SECRET:-}
+      AICORE_BASE_URL: ${AICORE_BASE_URL:-}
+      AICORE_RESOURCE_GROUP: ${AICORE_RESOURCE_GROUP:-}
+    ports:
+      - "127.0.0.1:8000:8000"

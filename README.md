@@ -89,12 +89,17 @@ For detailed selection guidance, see the [skills catalog](skills/README.md).
 Complementary SAP-authored skills for BTP, Cloud Foundry, Joule, UI5, and
 Fiori are available from [skills.cloud.sap](https://skills.cloud.sap/).
 
-## Experimental sample
+## Experimental samples
 
-[`samples/fde-a2a-minimal`](samples/fde-a2a-minimal/) is a credential-free
-Python A2A v1.0 sample with local, container, and Kyma deployment paths. It
-uses an in-memory task store and is limited to one replica. External `noAuth`
-exposure is intended only for development and smoke testing.
+- [`samples/fde-a2a-minimal`](samples/fde-a2a-minimal/) is a credential-free
+  Python A2A v1.0 sample with local, container, and Kyma deployment paths. It
+  uses an in-memory task store and is limited to one replica. External `noAuth`
+  exposure is intended only for development and smoke testing.
+- [`samples/production-order-agent`](samples/production-order-agent/) is a
+  mock-safe A2A v1.0 business example with two MCP tools for production-order
+  status and operations, an opt-in public SAP S/4HANA sandbox connection, and
+  optional SAP AI Core synthesis. Local and container paths are included; BTP
+  deployment is intentionally deferred.
 
 ## Support
 
