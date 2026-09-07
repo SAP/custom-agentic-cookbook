@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = ROOT / ".cookbook"
 STATE_FILE = STATE_DIR / "state.json"
 GENERATED_TFVARS = STATE_DIR / "generated.tfvars.json"
+LOCAL_STATE_FILES = ("state.json", "generated.tfvars.json")
 
 _SECRET_KEYS = {
     "api_key",
@@ -563,6 +564,303 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
     return 0
 
 
+def read_state(manifest_path: Path) -> tuple[Optional[Dict[str, Any]], bool]:
+    """Read workflow state without creating or repairing it."""
+    if not STATE_FILE.is_file():
+        return None, False
+    try:
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None, False
+    if not isinstance(state, dict):
+        return None, False
+    matches = (
+        manifest_path.is_file()
+        and state.get("manifest_sha256") == manifest_digest(manifest_path)
+    )
+    return state, matches
+
+
+def managed_parked_root(*, create: bool) -> Path:
+    """Resolve the allowlisted archive root and reject a redirected child path."""
+    state_root = STATE_DIR.resolve()
+    parked_path = STATE_DIR / "parked"
+    if parked_path.is_symlink():
+        raise CookbookError("managed parked root must not be a symbolic link")
+    if create:
+        parked_path.mkdir(parents=True, exist_ok=True)
+    parked_root = parked_path.resolve()
+    if parked_root.parent != state_root:
+        raise CookbookError("managed parked root must be directly below .cookbook")
+    return parked_root
+
+
+def command_park(manifest_path: Path) -> int:
+    """Move the manifest and known coordinator state into a local archive."""
+    if manifest_path.is_symlink():
+        raise CookbookError("pilot manifest must not be a symbolic link")
+    manifest = load_manifest(manifest_path)
+    subdomain = manifest["account"]["subdomain"]
+
+    sources = [manifest_path]
+    sources.extend(
+        path
+        for path in (STATE_DIR / name for name in LOCAL_STATE_FILES)
+        if path.exists()
+    )
+    symbolic = [str(path) for path in sources if path.is_symlink()]
+    if symbolic:
+        raise CookbookError(
+            "refusing to park symbolic-link state files:\n  " + "\n  ".join(symbolic)
+        )
+
+    parked_root = managed_parked_root(create=True)
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    target = parked_root / f"{subdomain}-{stamp}"
+    if target.exists():
+        raise CookbookError(f"park target already exists: {target}")
+    if target.resolve().parent != parked_root:
+        raise CookbookError("park target escaped the managed parked root")
+
+    state_target = target / "state"
+    state_target.mkdir(parents=True, mode=0o700)
+    metadata = {
+        "version": 1,
+        "parked_at": now(),
+        "subdomain": subdomain,
+        "manifest_sha256": manifest_digest(manifest_path),
+        "state_files": [path.name for path in sources[1:]],
+    }
+    atomic_json(target / "parked.json", metadata)
+
+    moves = [(manifest_path, target / "pilot.yaml")]
+    moves.extend((path, state_target / path.name) for path in sources[1:])
+    completed = []
+    try:
+        for source, destination in moves:
+            shutil.move(str(source), str(destination))
+            completed.append((source, destination))
+    except OSError as exc:
+        for source, destination in reversed(completed):
+            if destination.exists() and not source.exists():
+                shutil.move(str(destination), str(source))
+        for leftover in (target / "parked.json", state_target, target):
+            try:
+                if leftover.is_file():
+                    leftover.unlink()
+                elif leftover.is_dir() and not any(leftover.iterdir()):
+                    leftover.rmdir()
+            except OSError:
+                pass
+        raise CookbookError(f"could not park the pilot safely: {exc}") from exc
+
+    print(f"Pilot parked locally: {target}")
+    print("No SAP BTP resource was selected, changed, or stopped.")
+    print(f"Restore it with: ./cookbookctl unpark {target}")
+    return 0
+
+
+def validated_archive(archive: Path) -> tuple[Path, Dict[str, Any]]:
+    """Validate archive containment, ownership marker, and expected file set."""
+    parked_root = managed_parked_root(create=False)
+    if archive.is_symlink():
+        raise CookbookError("parked archive must not be a symbolic link")
+    try:
+        resolved = archive.resolve(strict=True)
+    except OSError as exc:
+        raise CookbookError(f"parked archive does not exist: {archive}") from exc
+    if resolved.parent != parked_root:
+        raise CookbookError(f"archive is outside the managed parked root: {archive}")
+    if not resolved.is_dir():
+        raise CookbookError(f"parked archive is not a directory: {archive}")
+
+    expected_top_level = {"parked.json", "pilot.yaml", "state"}
+    actual_top_level = {item.name for item in resolved.iterdir()}
+    if actual_top_level != expected_top_level:
+        raise CookbookError("parked archive contains missing or unexpected entries")
+    metadata_file = resolved / "parked.json"
+    if metadata_file.is_symlink() or not metadata_file.is_file():
+        raise CookbookError(f"invalid parked archive marker: {metadata_file}")
+    try:
+        metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise CookbookError(f"unreadable parked archive marker: {metadata_file}") from exc
+    if not isinstance(metadata, dict) or metadata.get("version") != 1:
+        raise CookbookError("parked archive marker must use version 1")
+    subdomain = metadata.get("subdomain")
+    if not isinstance(subdomain, str) or not resolved.name.startswith(f"{subdomain}-"):
+        raise CookbookError("parked archive marker does not match its directory")
+
+    manifest_source = resolved / "pilot.yaml"
+    state_source = resolved / "state"
+    if manifest_source.is_symlink() or not manifest_source.is_file():
+        raise CookbookError("parked archive has no regular pilot.yaml")
+    if state_source.is_symlink() or not state_source.is_dir():
+        raise CookbookError("parked archive has no regular state directory")
+    state_entries = list(state_source.iterdir())
+    if any(item.is_symlink() for item in state_entries):
+        raise CookbookError("parked archive state must not contain symbolic links")
+    if any(item.name not in LOCAL_STATE_FILES or not item.is_file() for item in state_entries):
+        raise CookbookError("parked archive contains unexpected state files")
+    if metadata.get("manifest_sha256") != manifest_digest(manifest_source):
+        raise CookbookError("parked manifest does not match the archive marker")
+    return resolved, metadata
+
+
+def command_unpark(archive: Path, manifest_path: Path) -> int:
+    """Restore a validated local archive to the caller-selected manifest path."""
+    archive, _ = validated_archive(archive)
+    sources = [(archive / "pilot.yaml", manifest_path)]
+    sources.extend(
+        (item, STATE_DIR / item.name) for item in sorted((archive / "state").iterdir())
+    )
+    conflicts = [str(destination) for _, destination in sources if destination.exists()]
+    if conflicts:
+        raise CookbookError(
+            "unpark would overwrite active workspace files:\n  " + "\n  ".join(conflicts)
+        )
+    if not manifest_path.parent.is_dir():
+        raise CookbookError(f"manifest parent directory does not exist: {manifest_path.parent}")
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+    completed = []
+    try:
+        for source, destination in sources:
+            shutil.move(str(source), str(destination))
+            completed.append((source, destination))
+    except OSError as exc:
+        for source, destination in reversed(completed):
+            if destination.exists() and not source.exists():
+                shutil.move(str(destination), str(source))
+        raise CookbookError(f"could not restore the pilot safely: {exc}") from exc
+
+    (archive / "parked.json").unlink()
+    (archive / "state").rmdir()
+    archive.rmdir()
+    print(f"Pilot restored locally: {manifest_path}")
+    print("Inspect it with './cookbookctl status'.")
+    return 0
+
+
+def active_pilot_report(manifest_path: Path) -> Dict[str, Any]:
+    summary = manifest_account_summary(manifest_path)
+    if not summary:
+        return {"exists": False, "path": str(manifest_path)}
+    state, matches = read_state(manifest_path)
+    stages = {}
+    if state is not None and matches:
+        stages = {
+            name: entry.get("status")
+            for name, entry in state.get("stages", {}).items()
+            if isinstance(entry, dict)
+        }
+    return {
+        "exists": True,
+        **summary,
+        "state_matches_manifest": matches,
+        "stages": stages,
+    }
+
+
+def parked_pilot_reports() -> List[Dict[str, Any]]:
+    parked_root = managed_parked_root(create=False)
+    if not parked_root.is_dir():
+        return []
+    reports = []
+    for item in sorted(parked_root.iterdir()):
+        if item.is_symlink() or not item.is_dir():
+            continue
+        metadata_file = item / "parked.json"
+        if metadata_file.is_symlink() or not metadata_file.is_file():
+            continue
+        try:
+            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(metadata, dict) or metadata.get("version") != 1:
+            continue
+        reports.append(
+            {
+                "path": str(item),
+                "subdomain": metadata.get("subdomain"),
+                "parked_at": metadata.get("parked_at"),
+            }
+        )
+    return reports
+
+
+def command_pilots(manifest_path: Path, *, as_json: bool) -> int:
+    """Report active and parked local pilot state without writing it."""
+    active = active_pilot_report(manifest_path)
+    parked = parked_pilot_reports()
+    if active["exists"]:
+        guidance = [
+            "Resume or revise the active pilot, or park it before starting another local pilot."
+        ]
+        if not active["state_matches_manifest"]:
+            guidance.append("The saved state is absent or does not match the manifest.")
+    elif parked:
+        guidance = ["Start fresh or restore a parked pilot with './cookbookctl unpark <path>'."]
+    else:
+        guidance = ["No pilot state exists; start with a fresh local manifest."]
+    report = {"active": active, "parked": parked, "guidance": guidance}
+    if as_json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+
+    print("Local pilot state")
+    if active["exists"]:
+        stages = ", ".join(
+            f"{name} {status}" for name, status in active["stages"].items()
+        ) or "no matching recorded stages"
+        print(f"  Active: {active['path']} ({active.get('subdomain')}); {stages}")
+    else:
+        print(f"  Active: none ({active['path']} does not exist)")
+    if parked:
+        print("  Parked:")
+        for item in parked:
+            print(
+                f"    - {item['path']} (subdomain {item['subdomain']}, "
+                f"parked {item['parked_at']})"
+            )
+    else:
+        print("  Parked: none")
+    for line in guidance:
+        print(f"  * {line}")
+    return 0
+
+
+def command_status(manifest_path: Path, *, as_json: bool) -> int:
+    """Report manifest, state, and rendered-file status without writing."""
+    active = active_pilot_report(manifest_path)
+    state, matches = read_state(manifest_path)
+    report = {
+        "manifest": active,
+        "state": {
+            "exists": STATE_FILE.is_file(),
+            "matches_manifest": matches,
+            "version": state.get("version") if state else None,
+            "stages": state.get("stages", {}) if state and matches else {},
+            "updated_at": state.get("updated_at") if state else None,
+        },
+        "rendered_inputs": {
+            "exists": GENERATED_TFVARS.is_file(),
+            "path": str(GENERATED_TFVARS),
+        },
+    }
+    if as_json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+    print("Cookbook coordinator status")
+    print(f"  Manifest: {'present' if active['exists'] else 'missing'} ({manifest_path})")
+    print(f"  State: {'matching' if matches else 'missing or stale'} ({STATE_FILE})")
+    print(
+        f"  Rendered inputs: {'present' if GENERATED_TFVARS.is_file() else 'missing'} "
+        f"({GENERATED_TFVARS})"
+    )
+    return 0
+
+
 def command_validate(manifest: Dict[str, Any], manifest_path: Path) -> int:
     rendered = render_tfvars(manifest)
     print(f"Manifest validation passed: {manifest_path}")
@@ -598,6 +896,13 @@ def parser() -> argparse.ArgumentParser:
         "accounts", help="discover the active global account and visible subaccounts"
     )
     accounts.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    pilots = subcommands.add_parser("pilots", help="show active and parked local pilots")
+    pilots.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    subcommands.add_parser("park", help="archive the active manifest and local state")
+    unpark = subcommands.add_parser("unpark", help="restore a parked local pilot")
+    unpark.add_argument("path", help="archive under .cookbook/parked")
+    status = subcommands.add_parser("status", help="show local coordinator status")
+    status.add_argument("--json", action="store_true", help="print machine-readable JSON")
     subcommands.add_parser(
         "validate", help="validate a manifest without writing files or local state"
     )
@@ -612,6 +917,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if args.command == "accounts":
             return command_accounts(manifest_path, as_json=args.json)
+        if args.command == "pilots":
+            return command_pilots(manifest_path, as_json=args.json)
+        if args.command == "park":
+            return command_park(manifest_path)
+        if args.command == "unpark":
+            return command_unpark(Path(args.path).expanduser(), manifest_path)
+        if args.command == "status":
+            return command_status(manifest_path, as_json=args.json)
         manifest = load_manifest(manifest_path)
         if args.command == "validate":
             return command_validate(manifest, manifest_path)

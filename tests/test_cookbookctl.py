@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import contextlib
 import importlib.util
 import io
@@ -254,6 +255,171 @@ class AccountDiscoveryTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertFalse(report["logged_in"])
         self.assertIn("btp login --sso", report["error"])
+
+
+class LocalPilotLifecycleTests(unittest.TestCase):
+    def state_patches(self, state_dir: Path):
+        return (
+            mock.patch.object(cookbookctl, "STATE_DIR", state_dir),
+            mock.patch.object(cookbookctl, "STATE_FILE", state_dir / "state.json"),
+            mock.patch.object(
+                cookbookctl,
+                "GENERATED_TFVARS",
+                state_dir / "generated.tfvars.json",
+            ),
+        )
+
+    @contextlib.contextmanager
+    def patched_state(self, state_dir: Path):
+        with contextlib.ExitStack() as stack:
+            for patcher in self.state_patches(state_dir):
+                stack.enter_context(patcher)
+            yield
+
+    def write_example_manifest(self, path: Path) -> None:
+        path.write_text(
+            (ROOT / "pilot.yaml.example").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+    def test_park_and_unpark_roundtrip_moves_only_known_local_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            state_dir.mkdir()
+            manifest_path = root / "pilot.yaml"
+            self.write_example_manifest(manifest_path)
+            (state_dir / "state.json").write_text('{"version": 1}\n', encoding="utf-8")
+            (state_dir / "generated.tfvars.json").write_text("{}\n", encoding="utf-8")
+            (state_dir / "notes.txt").write_text("leave me here\n", encoding="utf-8")
+
+            with self.patched_state(state_dir):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(cookbookctl.command_park(manifest_path), 0)
+                    archive = next((state_dir / "parked").iterdir())
+
+                self.assertFalse(manifest_path.exists())
+                self.assertFalse((state_dir / "state.json").exists())
+                self.assertFalse((state_dir / "generated.tfvars.json").exists())
+                self.assertTrue((state_dir / "notes.txt").is_file())
+                self.assertTrue((archive / "pilot.yaml").is_file())
+                self.assertTrue((archive / "state" / "state.json").is_file())
+                self.assertTrue((archive / "state" / "generated.tfvars.json").is_file())
+
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(
+                        cookbookctl.command_unpark(archive, manifest_path),
+                        0,
+                    )
+
+            self.assertTrue(manifest_path.is_file())
+            self.assertTrue((state_dir / "state.json").is_file())
+            self.assertTrue((state_dir / "generated.tfvars.json").is_file())
+            self.assertTrue((state_dir / "notes.txt").is_file())
+            self.assertFalse(archive.exists())
+
+    def test_unpark_refuses_to_overwrite_an_active_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            manifest_path = root / "pilot.yaml"
+            self.write_example_manifest(manifest_path)
+
+            with self.patched_state(state_dir):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    cookbookctl.command_park(manifest_path)
+                    archive = next((state_dir / "parked").iterdir())
+                    self.write_example_manifest(manifest_path)
+                    with self.assertRaisesRegex(cookbookctl.CookbookError, "overwrite"):
+                        cookbookctl.command_unpark(archive, manifest_path)
+
+            self.assertTrue((archive / "pilot.yaml").is_file())
+
+    def test_unpark_rejects_an_archive_outside_the_managed_parked_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            outside = root / "outside-archive"
+            outside.mkdir()
+            (outside / "parked.json").write_text(
+                '{"version": 1, "subdomain": "outside"}\n', encoding="utf-8"
+            )
+            self.write_example_manifest(outside / "pilot.yaml")
+
+            with self.patched_state(state_dir):
+                with self.assertRaisesRegex(cookbookctl.CookbookError, "managed parked root"):
+                    cookbookctl.command_unpark(outside, root / "pilot.yaml")
+
+            self.assertTrue((outside / "pilot.yaml").is_file())
+
+    def test_pilots_json_reports_matching_state_and_parked_archives(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            state_dir.mkdir()
+            manifest_path = root / "pilot.yaml"
+            self.write_example_manifest(manifest_path)
+            state = {
+                "version": 1,
+                "manifest_sha256": cookbookctl.manifest_digest(manifest_path),
+                "stages": {"render": {"status": "complete"}},
+            }
+            (state_dir / "state.json").write_text(
+                json.dumps(state), encoding="utf-8"
+            )
+            archive = state_dir / "parked" / "old-pilot-20260907T000000Z"
+            archive.mkdir(parents=True)
+            (archive / "parked.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "subdomain": "old-pilot",
+                        "parked_at": "2026-09-07T00:00:00+00:00",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.patched_state(state_dir):
+                with contextlib.redirect_stdout(io.StringIO()) as captured:
+                    self.assertEqual(
+                        cookbookctl.command_pilots(manifest_path, as_json=True),
+                        0,
+                    )
+
+            report = json.loads(captured.getvalue())
+            self.assertTrue(report["active"]["state_matches_manifest"])
+            self.assertEqual(report["active"]["stages"], {"render": "complete"})
+            self.assertEqual(report["parked"][0]["subdomain"], "old-pilot")
+
+    def test_status_is_read_only_in_a_fresh_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            with self.patched_state(state_dir):
+                with contextlib.redirect_stdout(io.StringIO()) as captured:
+                    self.assertEqual(
+                        cookbookctl.command_status(root / "pilot.yaml", as_json=True),
+                        0,
+                    )
+
+            report = json.loads(captured.getvalue())
+            self.assertFalse(report["manifest"]["exists"])
+            self.assertFalse(report["state"]["exists"])
+            self.assertFalse(state_dir.exists())
+
+    def test_cli_exposes_only_the_approved_commands(self) -> None:
+        coordinator_parser = cookbookctl.parser()
+        subparsers = next(
+            action
+            for action in coordinator_parser._actions
+            if isinstance(action, argparse._SubParsersAction)
+        )
+
+        self.assertEqual(
+            set(subparsers.choices),
+            {"validate", "render", "accounts", "pilots", "park", "unpark", "status"},
+        )
 
 
 if __name__ == "__main__":
