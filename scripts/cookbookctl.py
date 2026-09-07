@@ -299,8 +299,7 @@ def normalize_manifest(source: dict[str, Any]) -> dict[str, Any]:
         ]
         if missing:
             raise CookbookError(
-                "material Joule choices must be explicit; missing "
-                + ", ".join(missing)
+                "material Joule choices must be explicit; missing " + ", ".join(missing)
             )
         if joule["tenant_type"] not in {"PRODUCTIVE", "TEST"}:
             raise CookbookError("joule.tenant_type must be PRODUCTIVE or TEST")
@@ -402,9 +401,7 @@ def render_tfvars(manifest: dict[str, Any]) -> dict[str, Any]:
                 "auto_scaler_max": autoscaler.get("max"),
                 "entitlement_amount": kyma["entitlement_amount"],
                 "plan_unique_identifier": kyma.get("plan_unique_identifier"),
-                "extra_parameters_json": strict_json(
-                    kyma["parameters"], compact=True
-                ),
+                "extra_parameters_json": strict_json(kyma["parameters"], compact=True),
             }
         )
     joule = manifest["joule"]
@@ -917,8 +914,10 @@ def command_pilots(manifest_path: Path, *, as_json: bool) -> int:
     if active["exists"]:
         if not active["valid"]:
             guidance = [
-                "The active manifest exists but is invalid; revise it before resuming, "
-                "parking, or replacing it."
+                (
+                    "The active manifest exists but is invalid; revise it before "
+                    "resuming, parking, or replacing it."
+                )
             ]
         else:
             guidance = [

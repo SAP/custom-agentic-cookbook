@@ -387,13 +387,14 @@ class AccountDiscoveryTests(unittest.TestCase):
     def test_accounts_json_rejects_malformed_subaccount_payloads(self) -> None:
         for payload in ({}, {"value": None}, {"items": []}):
             with self.subTest(payload=payload):
-                def malformed_probe(*arguments: str):
+
+                def malformed_probe(*arguments: str, response: object = payload):
                     if arguments == ("get", "accounts/global-account"):
                         return {
                             "displayName": "Example Global Account",
                             "subdomain": "example-global",
                         }
-                    return payload
+                    return response
 
                 with (
                     mock.patch.object(cookbookctl, "command_exists", return_value=True),
@@ -583,47 +584,49 @@ class LocalPilotLifecycleTests(unittest.TestCase):
 
     def test_pilots_and_status_report_invalid_manifests_as_present(self) -> None:
         for content in ("version: [\n", "version: 1\nruntime: {}\n"):
-            with self.subTest(content=content):
-                with tempfile.TemporaryDirectory() as temporary:
-                    root = Path(temporary)
-                    state_dir = root / ".cookbook"
-                    manifest_path = root / "pilot.yaml"
-                    manifest_path.write_text(content, encoding="utf-8")
+            with (
+                self.subTest(content=content),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                state_dir = root / ".cookbook"
+                manifest_path = root / "pilot.yaml"
+                manifest_path.write_text(content, encoding="utf-8")
 
-                    with (
-                        self.patched_state(state_dir),
-                        contextlib.redirect_stdout(io.StringIO()) as captured,
-                    ):
-                        self.assertEqual(
-                            cookbookctl.command_pilots(manifest_path, as_json=True),
-                            0,
-                        )
-
-                    pilots_report = json.loads(captured.getvalue())
-                    self.assertTrue(pilots_report["active"]["exists"])
-                    self.assertFalse(pilots_report["active"]["valid"])
-                    self.assertTrue(
-                        any(
-                            "exists but is invalid" in line
-                            for line in pilots_report["guidance"]
-                        )
-                    )
-                    self.assertFalse(
-                        any("start fresh" in line for line in pilots_report["guidance"])
+                with (
+                    self.patched_state(state_dir),
+                    contextlib.redirect_stdout(io.StringIO()) as captured,
+                ):
+                    self.assertEqual(
+                        cookbookctl.command_pilots(manifest_path, as_json=True),
+                        0,
                     )
 
-                    with (
-                        self.patched_state(state_dir),
-                        contextlib.redirect_stdout(io.StringIO()) as captured,
-                    ):
-                        self.assertEqual(
-                            cookbookctl.command_status(manifest_path, as_json=False),
-                            0,
-                        )
+                pilots_report = json.loads(captured.getvalue())
+                self.assertTrue(pilots_report["active"]["exists"])
+                self.assertFalse(pilots_report["active"]["valid"])
+                self.assertTrue(
+                    any(
+                        "exists but is invalid" in line
+                        for line in pilots_report["guidance"]
+                    )
+                )
+                self.assertFalse(
+                    any("start fresh" in line for line in pilots_report["guidance"])
+                )
 
-                    self.assertIn("Manifest: invalid", captured.getvalue())
-                    self.assertTrue(manifest_path.is_file())
-                    self.assertFalse(state_dir.exists())
+                with (
+                    self.patched_state(state_dir),
+                    contextlib.redirect_stdout(io.StringIO()) as captured,
+                ):
+                    self.assertEqual(
+                        cookbookctl.command_status(manifest_path, as_json=False),
+                        0,
+                    )
+
+                self.assertIn("Manifest: invalid", captured.getvalue())
+                self.assertTrue(manifest_path.is_file())
+                self.assertFalse(state_dir.exists())
 
     def test_status_is_read_only_in_a_fresh_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
