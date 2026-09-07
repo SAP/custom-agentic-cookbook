@@ -10,6 +10,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -394,6 +396,173 @@ def record_stage(manifest_path: Path, stage: str, status: str) -> None:
     atomic_json(STATE_FILE, state)
 
 
+def command_exists(name: str) -> bool:
+    return shutil.which(name) is not None
+
+
+def btp_json(*arguments: str) -> Any:
+    """Run one of the coordinator's fixed read-only BTP CLI queries."""
+    if not command_exists("btp"):
+        return None
+    result = subprocess.run(
+        ["btp", "--format", "json", *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def subaccount_rows(payload: Any) -> List[Dict[str, Any]]:
+    """Normalize BTP CLI list output into a stable public JSON shape."""
+    items = payload.get("value", []) if isinstance(payload, dict) else payload
+    rows = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            {
+                "guid": item.get("guid"),
+                "display_name": item.get("displayName"),
+                "subdomain": item.get("subdomain"),
+                "region": item.get("region"),
+                "state": item.get("state"),
+                "used_for_production": item.get("usedForProduction"),
+            }
+        )
+    return rows
+
+
+def manifest_account_summary(path: Path) -> Optional[Dict[str, Any]]:
+    """Read only manifest account identifiers without creating local state."""
+    if yaml is None or not path.is_file():
+        return None
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    account = data.get("account") if isinstance(data, dict) else None
+    if not isinstance(account, dict):
+        return None
+    return {
+        "path": str(path),
+        "subdomain": account.get("subdomain"),
+        "global_account_subdomain": account.get("global_account_subdomain"),
+        "region": account.get("region"),
+    }
+
+
+def assess_manifest_subaccount(
+    manifest_subdomain: Optional[str], rows: List[Dict[str, Any]]
+) -> tuple[str, Optional[Dict[str, Any]]]:
+    if not manifest_subdomain:
+        return "unknown", None
+    existing = next(
+        (row for row in rows if row.get("subdomain") == manifest_subdomain), None
+    )
+    if existing is None:
+        return "available", None
+    return "already-exists", existing
+
+
+def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
+    """Discover the active global account without selecting or changing it."""
+    if not command_exists("btp"):
+        message = "btp CLI is not installed; install it and run 'btp login --sso'"
+        if as_json:
+            print(json.dumps({"logged_in": False, "error": message}, indent=2))
+        else:
+            print(f"Error: {message}", file=sys.stderr)
+        return 1
+
+    global_account = btp_json("get", "accounts/global-account")
+    if not isinstance(global_account, dict):
+        message = (
+            "no active BTP CLI session; run 'btp login --sso' and select the "
+            "intended global account"
+        )
+        if as_json:
+            print(json.dumps({"logged_in": False, "error": message}, indent=2))
+        else:
+            print(f"Error: {message}", file=sys.stderr)
+        return 1
+
+    rows = subaccount_rows(btp_json("list", "accounts/subaccount"))
+    active = manifest_account_summary(manifest_path)
+    session_subdomain = str(global_account.get("subdomain") or "")
+    guidance = [
+        "Discovery is read-only: cookbookctl does not select, adopt, or change a subaccount."
+    ]
+    manifest_report: Dict[str, Any] = {"exists": False, "path": str(manifest_path)}
+    if active:
+        expected_global = active.get("global_account_subdomain")
+        if expected_global and expected_global != session_subdomain:
+            assessment = "wrong-global-account"
+            existing = None
+            guidance.append(
+                f"The session targets '{session_subdomain}', but the manifest selects "
+                f"'{expected_global}'. Log in to the intended account before continuing."
+            )
+        else:
+            assessment, existing = assess_manifest_subaccount(
+                active.get("subdomain"), rows
+            )
+            if assessment == "available":
+                guidance.append(
+                    f"Subdomain '{active.get('subdomain')}' is not present in the visible account list."
+                )
+            elif assessment == "already-exists":
+                guidance.append(
+                    f"Subdomain '{active.get('subdomain')}' already exists. This command "
+                    "reports the match but does not select or adopt it."
+                )
+        manifest_report = {
+            "exists": True,
+            **active,
+            "assessment": assessment,
+            "existing_subaccount_guid": existing.get("guid") if existing else None,
+        }
+    else:
+        guidance.append("No manifest exists; review the visible subdomains before choosing one.")
+
+    report = {
+        "logged_in": True,
+        "global_account": {
+            "display_name": global_account.get("displayName"),
+            "subdomain": session_subdomain,
+        },
+        "subaccounts": rows,
+        "manifest": manifest_report,
+        "guidance": guidance,
+    }
+    if as_json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+
+    print("BTP account discovery")
+    print(
+        f"  Global account: {global_account.get('displayName')} "
+        f"(subdomain {session_subdomain})"
+    )
+    if rows:
+        print("  Visible subaccounts:")
+        for row in rows:
+            print(
+                f"    - {row.get('display_name')} (subdomain {row.get('subdomain')}, "
+                f"region {row.get('region')}, state {row.get('state')})"
+            )
+    else:
+        print("  Visible subaccounts: none")
+    for line in guidance:
+        print(f"  * {line}")
+    return 0
+
+
 def command_validate(manifest: Dict[str, Any], manifest_path: Path) -> int:
     rendered = render_tfvars(manifest)
     print(f"Manifest validation passed: {manifest_path}")
@@ -425,6 +594,10 @@ def parser() -> argparse.ArgumentParser:
         "--manifest", default="pilot.yaml", help="pilot manifest (default: pilot.yaml)"
     )
     subcommands = result.add_subparsers(dest="command", required=True)
+    accounts = subcommands.add_parser(
+        "accounts", help="discover the active global account and visible subaccounts"
+    )
+    accounts.add_argument("--json", action="store_true", help="print machine-readable JSON")
     subcommands.add_parser(
         "validate", help="validate a manifest without writing files or local state"
     )
@@ -437,6 +610,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser().parse_args(argv)
     manifest_path = Path(args.manifest).expanduser().resolve()
     try:
+        if args.command == "accounts":
+            return command_accounts(manifest_path, as_json=args.json)
         manifest = load_manifest(manifest_path)
         if args.command == "validate":
             return command_validate(manifest, manifest_path)

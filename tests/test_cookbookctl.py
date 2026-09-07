@@ -153,5 +153,108 @@ class ManifestAndRenderTests(unittest.TestCase):
             )
 
 
+class AccountDiscoveryTests(unittest.TestCase):
+    @staticmethod
+    def probe(calls: list[tuple[str, ...]]):
+        def fake(*arguments: str):
+            calls.append(arguments)
+            if arguments == ("get", "accounts/global-account"):
+                return {
+                    "displayName": "Example Global Account",
+                    "subdomain": "example-global",
+                }
+            if arguments == ("list", "accounts/subaccount"):
+                return {
+                    "value": [
+                        {
+                            "guid": "00000000-0000-0000-0000-000000000001",
+                            "displayName": "Existing Sandbox",
+                            "subdomain": "existing-sandbox",
+                            "region": "eu10",
+                            "state": "OK",
+                            "usedForProduction": "NOT_USED_FOR_PRODUCTION",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected BTP query: {arguments}")
+
+        return fake
+
+    def test_accounts_json_uses_only_read_only_global_account_queries(self) -> None:
+        calls: list[tuple[str, ...]] = []
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                mock.patch.object(cookbookctl, "command_exists", return_value=True),
+                mock.patch.object(cookbookctl, "btp_json", side_effect=self.probe(calls)),
+                contextlib.redirect_stdout(io.StringIO()) as captured,
+            ):
+                code = cookbookctl.command_accounts(root / "pilot.yaml", as_json=True)
+
+            report = json.loads(captured.getvalue())
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                calls,
+                [
+                    ("get", "accounts/global-account"),
+                    ("list", "accounts/subaccount"),
+                ],
+            )
+            self.assertTrue(report["logged_in"])
+            self.assertEqual(report["global_account"]["subdomain"], "example-global")
+            self.assertEqual(report["subaccounts"][0]["subdomain"], "existing-sandbox")
+            self.assertFalse(report["manifest"]["exists"])
+            self.assertFalse((root / ".cookbook").exists())
+
+    def test_accounts_reports_existing_manifest_subdomain_without_adopting_it(self) -> None:
+        calls: list[tuple[str, ...]] = []
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest_path = root / "pilot.yaml"
+            manifest_path.write_text(
+                "version: 1\n"
+                "account:\n"
+                "  global_account_subdomain: example-global\n"
+                "  name: Example\n"
+                "  subdomain: existing-sandbox\n"
+                "  region: eu10\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(cookbookctl, "command_exists", return_value=True),
+                mock.patch.object(cookbookctl, "btp_json", side_effect=self.probe(calls)),
+                contextlib.redirect_stdout(io.StringIO()) as captured,
+            ):
+                self.assertEqual(
+                    cookbookctl.command_accounts(manifest_path, as_json=True),
+                    0,
+                )
+
+            report = json.loads(captured.getvalue())
+            self.assertEqual(report["manifest"]["assessment"], "already-exists")
+            self.assertEqual(
+                report["manifest"]["existing_subaccount_guid"],
+                "00000000-0000-0000-0000-000000000001",
+            )
+            self.assertTrue(
+                any("does not select or adopt" in line for line in report["guidance"])
+            )
+
+    def test_accounts_json_reports_missing_session(self) -> None:
+        with (
+            mock.patch.object(cookbookctl, "command_exists", return_value=True),
+            mock.patch.object(cookbookctl, "btp_json", return_value=None),
+            contextlib.redirect_stdout(io.StringIO()) as captured,
+        ):
+            code = cookbookctl.command_accounts(
+                Path("/nonexistent/pilot.yaml"), as_json=True
+            )
+
+        report = json.loads(captured.getvalue())
+        self.assertEqual(code, 1)
+        self.assertFalse(report["logged_in"])
+        self.assertIn("btp login --sso", report["error"])
+
+
 if __name__ == "__main__":
     unittest.main()
