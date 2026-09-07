@@ -85,7 +85,9 @@ class ManifestAndRenderTests(unittest.TestCase):
 
     def test_manifest_rejects_embedded_credentials(self) -> None:
         source = self.complete_manifest()
-        source["account"]["client_secret"] = "do-not-store-this"
+        source["account"]["client_secret"] = (
+            "do-not-store-this"  # pragma: allowlist secret
+        )
 
         with self.assertRaisesRegex(cookbookctl.CookbookError, "credential-free"):
             cookbookctl.normalize_manifest(source)
