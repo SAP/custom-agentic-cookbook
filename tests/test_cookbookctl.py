@@ -153,6 +153,38 @@ class ManifestAndRenderTests(unittest.TestCase):
                 0o600,
             )
 
+    def test_render_rebuilds_malformed_local_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / ".cookbook"
+            state_dir.mkdir()
+            manifest_path = root / "pilot.yaml"
+            manifest_path.write_text(
+                (ROOT / "pilot.yaml.example").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (state_dir / "state.json").write_text("[]\n", encoding="utf-8")
+            manifest = cookbookctl.load_manifest(manifest_path)
+
+            with (
+                mock.patch.object(cookbookctl, "STATE_DIR", state_dir),
+                mock.patch.object(cookbookctl, "STATE_FILE", state_dir / "state.json"),
+                mock.patch.object(
+                    cookbookctl,
+                    "GENERATED_TFVARS",
+                    state_dir / "generated.tfvars.json",
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(
+                    cookbookctl.command_render(manifest, manifest_path, stdout=False),
+                    0,
+                )
+
+            rebuilt = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+            self.assertEqual(rebuilt["version"], 1)
+            self.assertEqual(rebuilt["stages"]["render"]["status"], "complete")
+
 
 class AccountDiscoveryTests(unittest.TestCase):
     @staticmethod

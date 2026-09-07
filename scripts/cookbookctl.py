@@ -378,7 +378,12 @@ def load_state(manifest_path: Path) -> Dict[str, Any]:
             state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             state = {}
-    if state.get("manifest_sha256") != digest:
+    if (
+        not isinstance(state, dict)
+        or state.get("version") != 1
+        or state.get("manifest_sha256") != digest
+        or not isinstance(state.get("stages"), dict)
+    ):
         state = {
             "version": 1,
             "manifest": str(manifest_path),
