@@ -1,0 +1,17 @@
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Local pilot configuration and coordinator state
+pilot.yaml
+/.cookbook/
+
+# Local credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key

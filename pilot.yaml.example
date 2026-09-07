@@ -1,0 +1,46 @@
+version: 1
+
+account:
+  global_account_subdomain: example-global-account
+  name: Agent Cookbook Development
+  subdomain: change-me-agent-cookbook
+  region: eu10
+  usage: NOT_USED_FOR_PRODUCTION
+  admins:
+    - developer@example.com
+
+runtime:
+  # Choose exactly one runtime: cf or kyma.
+  target: kyma
+  cloudfoundry:
+    enabled: false
+  kyma:
+    mode: if_available
+    plan: aws
+    region: eu-central-1
+    machine_type: mi.large
+    autoscaler:
+      min: 3
+      max: 5
+    parameters: {}
+
+agent:
+  name: procurement-assistant
+  purpose: Find supplier and purchase-order information for procurement teams.
+  # These material architecture choices must all be explicit.
+  language: typescript
+  framework: express
+  taskstore: memory
+  llm_provider: aicore
+
+joule:
+  enabled: false
+
+services:
+  # Choice-derived entitlements are added during rendering. Add only extra,
+  # application-specific entitlements here.
+  entitlements: {}
+
+verification:
+  a2a_version: "1.0"
+  agent_card_path: /.well-known/agent-card.json
