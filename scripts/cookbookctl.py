@@ -14,8 +14,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 try:
     import yaml
@@ -55,7 +56,9 @@ def now() -> str:
 def atomic_json(path: Path, value: Any) -> None:
     """Write private local state atomically with deterministic JSON formatting."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=str(path.parent)
+    )
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(value, handle, indent=2, sort_keys=True)
@@ -67,7 +70,7 @@ def atomic_json(path: Path, value: Any) -> None:
             os.unlink(temporary)
 
 
-def require_mapping(value: Any, name: str) -> Dict[str, Any]:
+def require_mapping(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise CookbookError(f"{name} must be a YAML mapping")
     return value
@@ -80,7 +83,7 @@ def required_text(mapping: Mapping[str, Any], key: str, path: str) -> str:
     return value.strip()
 
 
-def optional_text(mapping: Mapping[str, Any], key: str, path: str) -> Optional[str]:
+def optional_text(mapping: Mapping[str, Any], key: str, path: str) -> str | None:
     value = mapping.get(key)
     if value is None:
         return None
@@ -89,7 +92,7 @@ def optional_text(mapping: Mapping[str, Any], key: str, path: str) -> Optional[s
     return value.strip()
 
 
-def text_list(value: Any, path: str) -> List[str]:
+def text_list(value: Any, path: str) -> list[str]:
     if not isinstance(value, list) or any(
         not isinstance(item, str) or not item.strip() for item in value
     ):
@@ -113,7 +116,7 @@ def reject_embedded_credentials(value: Any, path: str = "manifest") -> None:
 
 
 def ensure_entitlement(
-    entitlements: Dict[str, Any], key: str, service_name: str, plan_name: str
+    entitlements: dict[str, Any], key: str, service_name: str, plan_name: str
 ) -> None:
     for value in entitlements.values():
         if value["service_name"] == service_name and value["plan_name"] == plan_name:
@@ -125,7 +128,7 @@ def ensure_entitlement(
     entitlements[key] = {"service_name": service_name, "plan_name": plan_name}
 
 
-def load_manifest(path: Path) -> Dict[str, Any]:
+def load_manifest(path: Path) -> dict[str, Any]:
     if yaml is None:
         raise CookbookError(
             "PyYAML is required; install requirements-cookbookctl.txt in a virtual environment"
@@ -139,7 +142,7 @@ def load_manifest(path: Path) -> Dict[str, Any]:
     return normalize_manifest(require_mapping(loaded, "manifest"))
 
 
-def normalize_manifest(source: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_manifest(source: dict[str, Any]) -> dict[str, Any]:
     reject_embedded_credentials(source)
     manifest = copy.deepcopy(source)
     if manifest.get("version") != 1:
@@ -179,13 +182,19 @@ def normalize_manifest(source: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(cloudfoundry["enabled"], bool):
         raise CookbookError("runtime.cloudfoundry.enabled must be true or false")
     if target == "cf" and not cloudfoundry["enabled"]:
-        raise CookbookError("runtime.cloudfoundry.enabled must be true for a cf runtime")
+        raise CookbookError(
+            "runtime.cloudfoundry.enabled must be true for a cf runtime"
+        )
     if target == "kyma" and cloudfoundry["enabled"]:
-        raise CookbookError("Cloud Foundry and Kyma are mutually exclusive runtime targets")
+        raise CookbookError(
+            "Cloud Foundry and Kyma are mutually exclusive runtime targets"
+        )
     cloudfoundry.setdefault("spaces", {"dev": {"name": "dev"}})
     spaces = require_mapping(cloudfoundry["spaces"], "runtime.cloudfoundry.spaces")
     if cloudfoundry["enabled"] and not spaces:
-        raise CookbookError("runtime.cloudfoundry.spaces must contain at least one space")
+        raise CookbookError(
+            "runtime.cloudfoundry.spaces must contain at least one space"
+        )
     api_url = optional_text(cloudfoundry, "api_url", "runtime.cloudfoundry")
     if api_url is not None and not api_url.startswith("https://"):
         raise CookbookError("runtime.cloudfoundry.api_url must start with https://")
@@ -213,11 +222,15 @@ def normalize_manifest(source: Dict[str, Any]) -> Dict[str, Any]:
         if minimum is not None and (
             isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 0
         ):
-            raise CookbookError("runtime.kyma.autoscaler.min must be a non-negative integer")
+            raise CookbookError(
+                "runtime.kyma.autoscaler.min must be a non-negative integer"
+            )
         if maximum is not None and (
             isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1
         ):
-            raise CookbookError("runtime.kyma.autoscaler.max must be a positive integer")
+            raise CookbookError(
+                "runtime.kyma.autoscaler.max must be a positive integer"
+            )
         if minimum is not None and maximum is not None and maximum < minimum:
             raise CookbookError("runtime.kyma.autoscaler.max must be >= min")
         require_mapping(kyma.setdefault("parameters", {}), "runtime.kyma.parameters")
@@ -231,7 +244,8 @@ def normalize_manifest(source: Dict[str, Any]) -> Dict[str, Any]:
     missing = [f"agent.{key}" for key in material_choices if key not in agent]
     if missing:
         raise CookbookError(
-            "material architecture choices must be explicit; missing " + ", ".join(missing)
+            "material architecture choices must be explicit; missing "
+            + ", ".join(missing)
         )
     for key in material_choices:
         agent[key] = required_text(agent, key, "agent")
@@ -275,7 +289,9 @@ def normalize_manifest(source: Dict[str, Any]) -> Dict[str, Any]:
         )
         amount = entitlement.get("amount")
         if amount is not None and (
-            isinstance(amount, bool) or not isinstance(amount, (int, float)) or amount < 0
+            isinstance(amount, bool)
+            or not isinstance(amount, (int, float))
+            or amount < 0
         ):
             raise CookbookError(
                 f"services.entitlements.{key}.amount must be a non-negative number"
@@ -306,11 +322,11 @@ def normalize_manifest(source: Dict[str, Any]) -> Dict[str, Any]:
     return manifest
 
 
-def compact(mapping: Dict[str, Any]) -> Dict[str, Any]:
+def compact(mapping: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in mapping.items() if value is not None}
 
 
-def render_tfvars(manifest: Dict[str, Any]) -> Dict[str, Any]:
+def render_tfvars(manifest: dict[str, Any]) -> dict[str, Any]:
     account = manifest["account"]
     runtime = manifest["runtime"]
     cloudfoundry = runtime["cloudfoundry"]
@@ -370,7 +386,7 @@ def manifest_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_state(manifest_path: Path) -> Dict[str, Any]:
+def load_state(manifest_path: Path) -> dict[str, Any]:
     digest = manifest_digest(manifest_path)
     state = {}
     if STATE_FILE.is_file():
@@ -424,7 +440,7 @@ def btp_json(*arguments: str) -> Any:
         return None
 
 
-def subaccount_rows(payload: Any) -> List[Dict[str, Any]]:
+def subaccount_rows(payload: Any) -> list[dict[str, Any]]:
     """Normalize BTP CLI list output into a stable public JSON shape."""
     items = payload.get("value", []) if isinstance(payload, dict) else payload
     rows = []
@@ -444,7 +460,7 @@ def subaccount_rows(payload: Any) -> List[Dict[str, Any]]:
     return rows
 
 
-def manifest_account_summary(path: Path) -> Optional[Dict[str, Any]]:
+def manifest_account_summary(path: Path) -> dict[str, Any] | None:
     """Read only manifest account identifiers without creating local state."""
     if yaml is None or not path.is_file():
         return None
@@ -464,8 +480,8 @@ def manifest_account_summary(path: Path) -> Optional[Dict[str, Any]]:
 
 
 def assess_manifest_subaccount(
-    manifest_subdomain: Optional[str], rows: List[Dict[str, Any]]
-) -> tuple[str, Optional[Dict[str, Any]]]:
+    manifest_subdomain: str | None, rows: list[dict[str, Any]]
+) -> tuple[str, dict[str, Any] | None]:
     if not manifest_subdomain:
         return "unknown", None
     existing = next(
@@ -504,7 +520,7 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
     guidance = [
         "Discovery is read-only: cookbookctl does not select, adopt, or change a subaccount."
     ]
-    manifest_report: Dict[str, Any] = {"exists": False, "path": str(manifest_path)}
+    manifest_report: dict[str, Any] = {"exists": False, "path": str(manifest_path)}
     if active:
         expected_global = active.get("global_account_subdomain")
         if expected_global and expected_global != session_subdomain:
@@ -534,7 +550,9 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
             "existing_subaccount_guid": existing.get("guid") if existing else None,
         }
     else:
-        guidance.append("No manifest exists; review the visible subdomains before choosing one.")
+        guidance.append(
+            "No manifest exists; review the visible subdomains before choosing one."
+        )
 
     report = {
         "logged_in": True,
@@ -569,7 +587,7 @@ def command_accounts(manifest_path: Path, *, as_json: bool) -> int:
     return 0
 
 
-def read_state(manifest_path: Path) -> tuple[Optional[Dict[str, Any]], bool]:
+def read_state(manifest_path: Path) -> tuple[dict[str, Any] | None, bool]:
     """Read workflow state without creating or repairing it."""
     if not STATE_FILE.is_file():
         return None, False
@@ -579,10 +597,9 @@ def read_state(manifest_path: Path) -> tuple[Optional[Dict[str, Any]], bool]:
         return None, False
     if not isinstance(state, dict):
         return None, False
-    matches = (
-        manifest_path.is_file()
-        and state.get("manifest_sha256") == manifest_digest(manifest_path)
-    )
+    matches = manifest_path.is_file() and state.get(
+        "manifest_sha256"
+    ) == manifest_digest(manifest_path)
     return state, matches
 
 
@@ -665,7 +682,7 @@ def command_park(manifest_path: Path) -> int:
     return 0
 
 
-def validated_archive(archive: Path) -> tuple[Path, Dict[str, Any]]:
+def validated_archive(archive: Path) -> tuple[Path, dict[str, Any]]:
     """Validate archive containment, ownership marker, and expected file set."""
     parked_root = managed_parked_root(create=False)
     if archive.is_symlink():
@@ -689,7 +706,9 @@ def validated_archive(archive: Path) -> tuple[Path, Dict[str, Any]]:
     try:
         metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        raise CookbookError(f"unreadable parked archive marker: {metadata_file}") from exc
+        raise CookbookError(
+            f"unreadable parked archive marker: {metadata_file}"
+        ) from exc
     if not isinstance(metadata, dict) or metadata.get("version") != 1:
         raise CookbookError("parked archive marker must use version 1")
     subdomain = metadata.get("subdomain")
@@ -705,7 +724,10 @@ def validated_archive(archive: Path) -> tuple[Path, Dict[str, Any]]:
     state_entries = list(state_source.iterdir())
     if any(item.is_symlink() for item in state_entries):
         raise CookbookError("parked archive state must not contain symbolic links")
-    if any(item.name not in LOCAL_STATE_FILES or not item.is_file() for item in state_entries):
+    if any(
+        item.name not in LOCAL_STATE_FILES or not item.is_file()
+        for item in state_entries
+    ):
         raise CookbookError("parked archive contains unexpected state files")
     if metadata.get("manifest_sha256") != manifest_digest(manifest_source):
         raise CookbookError("parked manifest does not match the archive marker")
@@ -722,10 +744,13 @@ def command_unpark(archive: Path, manifest_path: Path) -> int:
     conflicts = [str(destination) for _, destination in sources if destination.exists()]
     if conflicts:
         raise CookbookError(
-            "unpark would overwrite active workspace files:\n  " + "\n  ".join(conflicts)
+            "unpark would overwrite active workspace files:\n  "
+            + "\n  ".join(conflicts)
         )
     if not manifest_path.parent.is_dir():
-        raise CookbookError(f"manifest parent directory does not exist: {manifest_path.parent}")
+        raise CookbookError(
+            f"manifest parent directory does not exist: {manifest_path.parent}"
+        )
     STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     completed = []
@@ -747,7 +772,7 @@ def command_unpark(archive: Path, manifest_path: Path) -> int:
     return 0
 
 
-def active_pilot_report(manifest_path: Path) -> Dict[str, Any]:
+def active_pilot_report(manifest_path: Path) -> dict[str, Any]:
     summary = manifest_account_summary(manifest_path)
     if not summary:
         return {"exists": False, "path": str(manifest_path)}
@@ -767,7 +792,7 @@ def active_pilot_report(manifest_path: Path) -> Dict[str, Any]:
     }
 
 
-def parked_pilot_reports() -> List[Dict[str, Any]]:
+def parked_pilot_reports() -> list[dict[str, Any]]:
     parked_root = managed_parked_root(create=False)
     if not parked_root.is_dir():
         return []
@@ -805,7 +830,9 @@ def command_pilots(manifest_path: Path, *, as_json: bool) -> int:
         if not active["state_matches_manifest"]:
             guidance.append("The saved state is absent or does not match the manifest.")
     elif parked:
-        guidance = ["Start fresh or restore a parked pilot with './cookbookctl unpark <path>'."]
+        guidance = [
+            "Start fresh or restore a parked pilot with './cookbookctl unpark <path>'."
+        ]
     else:
         guidance = ["No pilot state exists; start with a fresh local manifest."]
     report = {"active": active, "parked": parked, "guidance": guidance}
@@ -815,9 +842,10 @@ def command_pilots(manifest_path: Path, *, as_json: bool) -> int:
 
     print("Local pilot state")
     if active["exists"]:
-        stages = ", ".join(
-            f"{name} {status}" for name, status in active["stages"].items()
-        ) or "no matching recorded stages"
+        stages = (
+            ", ".join(f"{name} {status}" for name, status in active["stages"].items())
+            or "no matching recorded stages"
+        )
         print(f"  Active: {active['path']} ({active.get('subdomain')}); {stages}")
     else:
         print(f"  Active: none ({active['path']} does not exist)")
@@ -857,7 +885,9 @@ def command_status(manifest_path: Path, *, as_json: bool) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     print("Cookbook coordinator status")
-    print(f"  Manifest: {'present' if active['exists'] else 'missing'} ({manifest_path})")
+    print(
+        f"  Manifest: {'present' if active['exists'] else 'missing'} ({manifest_path})"
+    )
     print(f"  State: {'matching' if matches else 'missing or stale'} ({STATE_FILE})")
     print(
         f"  Rendered inputs: {'present' if GENERATED_TFVARS.is_file() else 'missing'} "
@@ -866,7 +896,7 @@ def command_status(manifest_path: Path, *, as_json: bool) -> int:
     return 0
 
 
-def command_validate(manifest: Dict[str, Any], manifest_path: Path) -> int:
+def command_validate(manifest: dict[str, Any], manifest_path: Path) -> int:
     rendered = render_tfvars(manifest)
     print(f"Manifest validation passed: {manifest_path}")
     print(
@@ -880,7 +910,7 @@ def command_validate(manifest: Dict[str, Any], manifest_path: Path) -> int:
     return 0
 
 
-def command_render(manifest: Dict[str, Any], manifest_path: Path, stdout: bool) -> int:
+def command_render(manifest: dict[str, Any], manifest_path: Path, stdout: bool) -> int:
     rendered = render_tfvars(manifest)
     atomic_json(GENERATED_TFVARS, rendered)
     record_stage(manifest_path, "render", "complete")
@@ -900,14 +930,22 @@ def parser() -> argparse.ArgumentParser:
     accounts = subcommands.add_parser(
         "accounts", help="discover the active global account and visible subaccounts"
     )
-    accounts.add_argument("--json", action="store_true", help="print machine-readable JSON")
-    pilots = subcommands.add_parser("pilots", help="show active and parked local pilots")
-    pilots.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    accounts.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    pilots = subcommands.add_parser(
+        "pilots", help="show active and parked local pilots"
+    )
+    pilots.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
     subcommands.add_parser("park", help="archive the active manifest and local state")
     unpark = subcommands.add_parser("unpark", help="restore a parked local pilot")
     unpark.add_argument("path", help="archive under .cookbook/parked")
     status = subcommands.add_parser("status", help="show local coordinator status")
-    status.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    status.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
     subcommands.add_parser(
         "validate", help="validate a manifest without writing files or local state"
     )
@@ -916,7 +954,7 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     manifest_path = Path(args.manifest).expanduser().resolve()
     try:

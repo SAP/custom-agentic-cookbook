@@ -11,7 +11,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
     "cookbookctl", ROOT / "scripts" / "cookbookctl.py"
@@ -133,7 +132,9 @@ class ManifestAndRenderTests(unittest.TestCase):
                 for _ in range(2):
                     with contextlib.redirect_stdout(io.StringIO()) as captured:
                         self.assertEqual(
-                            cookbookctl.command_render(manifest, manifest_path, stdout=True),
+                            cookbookctl.command_render(
+                                manifest, manifest_path, stdout=True
+                            ),
                             0,
                         )
                     outputs.append(json.loads(captured.getvalue()))
@@ -219,7 +220,9 @@ class AccountDiscoveryTests(unittest.TestCase):
             root = Path(temporary)
             with (
                 mock.patch.object(cookbookctl, "command_exists", return_value=True),
-                mock.patch.object(cookbookctl, "btp_json", side_effect=self.probe(calls)),
+                mock.patch.object(
+                    cookbookctl, "btp_json", side_effect=self.probe(calls)
+                ),
                 contextlib.redirect_stdout(io.StringIO()) as captured,
             ):
                 code = cookbookctl.command_accounts(root / "pilot.yaml", as_json=True)
@@ -239,7 +242,9 @@ class AccountDiscoveryTests(unittest.TestCase):
             self.assertFalse(report["manifest"]["exists"])
             self.assertFalse((root / ".cookbook").exists())
 
-    def test_accounts_reports_existing_manifest_subdomain_without_adopting_it(self) -> None:
+    def test_accounts_reports_existing_manifest_subdomain_without_adopting_it(
+        self,
+    ) -> None:
         calls: list[tuple[str, ...]] = []
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -255,7 +260,9 @@ class AccountDiscoveryTests(unittest.TestCase):
             )
             with (
                 mock.patch.object(cookbookctl, "command_exists", return_value=True),
-                mock.patch.object(cookbookctl, "btp_json", side_effect=self.probe(calls)),
+                mock.patch.object(
+                    cookbookctl, "btp_json", side_effect=self.probe(calls)
+                ),
                 contextlib.redirect_stdout(io.StringIO()) as captured,
             ):
                 self.assertEqual(
@@ -325,24 +332,29 @@ class LocalPilotLifecycleTests(unittest.TestCase):
             (state_dir / "generated.tfvars.json").write_text("{}\n", encoding="utf-8")
             (state_dir / "notes.txt").write_text("leave me here\n", encoding="utf-8")
 
-            with self.patched_state(state_dir):
-                with contextlib.redirect_stdout(io.StringIO()):
-                    self.assertEqual(cookbookctl.command_park(manifest_path), 0)
-                    archive = next((state_dir / "parked").iterdir())
+            with (
+                self.patched_state(state_dir),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(cookbookctl.command_park(manifest_path), 0)
+                archive = next((state_dir / "parked").iterdir())
 
-                self.assertFalse(manifest_path.exists())
-                self.assertFalse((state_dir / "state.json").exists())
-                self.assertFalse((state_dir / "generated.tfvars.json").exists())
-                self.assertTrue((state_dir / "notes.txt").is_file())
-                self.assertTrue((archive / "pilot.yaml").is_file())
-                self.assertTrue((archive / "state" / "state.json").is_file())
-                self.assertTrue((archive / "state" / "generated.tfvars.json").is_file())
+            self.assertFalse(manifest_path.exists())
+            self.assertFalse((state_dir / "state.json").exists())
+            self.assertFalse((state_dir / "generated.tfvars.json").exists())
+            self.assertTrue((state_dir / "notes.txt").is_file())
+            self.assertTrue((archive / "pilot.yaml").is_file())
+            self.assertTrue((archive / "state" / "state.json").is_file())
+            self.assertTrue((archive / "state" / "generated.tfvars.json").is_file())
 
-                with contextlib.redirect_stdout(io.StringIO()):
-                    self.assertEqual(
-                        cookbookctl.command_unpark(archive, manifest_path),
-                        0,
-                    )
+            with (
+                self.patched_state(state_dir),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                self.assertEqual(
+                    cookbookctl.command_unpark(archive, manifest_path),
+                    0,
+                )
 
             self.assertTrue(manifest_path.is_file())
             self.assertTrue((state_dir / "state.json").is_file())
@@ -357,13 +369,18 @@ class LocalPilotLifecycleTests(unittest.TestCase):
             manifest_path = root / "pilot.yaml"
             self.write_example_manifest(manifest_path)
 
-            with self.patched_state(state_dir):
-                with contextlib.redirect_stdout(io.StringIO()):
-                    cookbookctl.command_park(manifest_path)
-                    archive = next((state_dir / "parked").iterdir())
-                    self.write_example_manifest(manifest_path)
-                    with self.assertRaisesRegex(cookbookctl.CookbookError, "overwrite"):
-                        cookbookctl.command_unpark(archive, manifest_path)
+            with (
+                self.patched_state(state_dir),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                cookbookctl.command_park(manifest_path)
+                archive = next((state_dir / "parked").iterdir())
+            self.write_example_manifest(manifest_path)
+            with (
+                self.patched_state(state_dir),
+                self.assertRaisesRegex(cookbookctl.CookbookError, "overwrite"),
+            ):
+                cookbookctl.command_unpark(archive, manifest_path)
 
             self.assertTrue((archive / "pilot.yaml").is_file())
 
@@ -378,9 +395,13 @@ class LocalPilotLifecycleTests(unittest.TestCase):
             )
             self.write_example_manifest(outside / "pilot.yaml")
 
-            with self.patched_state(state_dir):
-                with self.assertRaisesRegex(cookbookctl.CookbookError, "managed parked root"):
-                    cookbookctl.command_unpark(outside, root / "pilot.yaml")
+            with (
+                self.patched_state(state_dir),
+                self.assertRaisesRegex(
+                    cookbookctl.CookbookError, "managed parked root"
+                ),
+            ):
+                cookbookctl.command_unpark(outside, root / "pilot.yaml")
 
             self.assertTrue((outside / "pilot.yaml").is_file())
 
@@ -396,9 +417,7 @@ class LocalPilotLifecycleTests(unittest.TestCase):
                 "manifest_sha256": cookbookctl.manifest_digest(manifest_path),
                 "stages": {"render": {"status": "complete"}},
             }
-            (state_dir / "state.json").write_text(
-                json.dumps(state), encoding="utf-8"
-            )
+            (state_dir / "state.json").write_text(json.dumps(state), encoding="utf-8")
             archive = state_dir / "parked" / "old-pilot-20260907T000000Z"
             archive.mkdir(parents=True)
             (archive / "parked.json").write_text(
@@ -412,12 +431,14 @@ class LocalPilotLifecycleTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.patched_state(state_dir):
-                with contextlib.redirect_stdout(io.StringIO()) as captured:
-                    self.assertEqual(
-                        cookbookctl.command_pilots(manifest_path, as_json=True),
-                        0,
-                    )
+            with (
+                self.patched_state(state_dir),
+                contextlib.redirect_stdout(io.StringIO()) as captured,
+            ):
+                self.assertEqual(
+                    cookbookctl.command_pilots(manifest_path, as_json=True),
+                    0,
+                )
 
             report = json.loads(captured.getvalue())
             self.assertTrue(report["active"]["state_matches_manifest"])
@@ -428,12 +449,14 @@ class LocalPilotLifecycleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             state_dir = root / ".cookbook"
-            with self.patched_state(state_dir):
-                with contextlib.redirect_stdout(io.StringIO()) as captured:
-                    self.assertEqual(
-                        cookbookctl.command_status(root / "pilot.yaml", as_json=True),
-                        0,
-                    )
+            with (
+                self.patched_state(state_dir),
+                contextlib.redirect_stdout(io.StringIO()) as captured,
+            ):
+                self.assertEqual(
+                    cookbookctl.command_status(root / "pilot.yaml", as_json=True),
+                    0,
+                )
 
             report = json.loads(captured.getvalue())
             self.assertFalse(report["manifest"]["exists"])
