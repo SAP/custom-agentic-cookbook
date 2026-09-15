@@ -1,0 +1,40 @@
+scenario:
+  id: sales-orders
+  title: Sales order tracker
+  summary: Order status, items, and delivery dates for sales teams.
+  eventual_system: SAP S/4HANA Sales (OData API_SALES_ORDER_SRV)
+
+agent:
+  name: sales-order-tracker
+  purpose: Look up sales orders, their status, items, and delivery dates for sales teams.
+  spec:
+    audience: Internal sales representatives and customer service agents
+    system_prompt: >-
+      Help sales users find concise, evidence-backed sales-order information.
+      Answer only from tool results; when data is unavailable, say so instead
+      of guessing.
+    tools:
+      - name: lookup_sales_order
+        description: Fetch one sales order with status, items, and delivery dates.
+        parameters:
+          - name: order_id
+            type: string
+            description: Sales order number.
+        returns: SalesOrderSummary
+        backend: mock
+      - name: list_open_orders
+        description: List open sales orders for a customer.
+        parameters:
+          - name: customer_id
+            type: string
+            description: Customer identifier.
+        returns: SalesOrderList
+        backend: mock
+    skills:
+      - id: sales-order-lookup
+        name: Sales Order Lookup
+        description: Finds sales-order status, items, and delivery dates.
+        tags: [sales, orders]
+        examples:
+          - What is the status of order 4500012345?
+          - Show open orders for customer 100077.

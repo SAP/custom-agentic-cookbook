@@ -1,0 +1,47 @@
+scenario:
+  id: hr-leave
+  title: HR leave assistant
+  summary: Leave balances and team absences for employees and managers.
+  eventual_system: SAP SuccessFactors (Time Off OData APIs)
+
+agent:
+  name: leave-assistant
+  purpose: Answer employee questions about leave balances and team absences.
+  spec:
+    audience: Employees and people managers
+    system_prompt: >-
+      Help employees and managers find concise, evidence-backed time-off
+      information. Answer only from tool results; when data is unavailable,
+      say so instead of guessing. Never reveal one employee's data to another
+      user.
+    tools:
+      - name: lookup_leave_balance
+        description: Fetch the remaining leave balance for an employee by type.
+        parameters:
+          - name: employee_id
+            type: string
+            description: Employee identifier.
+        returns: LeaveBalanceSummary
+        backend: mock
+      - name: list_team_absences
+        description: List approved absences for a manager's team in a date range.
+        parameters:
+          - name: manager_id
+            type: string
+            description: Manager's employee identifier.
+          - name: from_date
+            type: string
+            description: Range start (YYYY-MM-DD).
+          - name: to_date
+            type: string
+            description: Range end (YYYY-MM-DD).
+        returns: AbsenceList
+        backend: mock
+    skills:
+      - id: leave-lookup
+        name: Leave Lookup
+        description: Finds leave balances and team absence schedules.
+        tags: [hr, time-off]
+        examples:
+          - How many vacation days do I have left?
+          - Who on my team is out next week?

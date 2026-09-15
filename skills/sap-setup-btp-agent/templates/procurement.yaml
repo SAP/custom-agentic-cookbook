@@ -1,0 +1,40 @@
+scenario:
+  id: procurement
+  title: Procurement assistant
+  summary: Supplier and purchase-order lookups for procurement teams.
+  eventual_system: SAP S/4HANA MM or SAP Ariba (Business Partner / Purchase Order APIs)
+
+agent:
+  name: procurement-assistant
+  purpose: Find supplier and purchase-order information for procurement teams.
+  spec:
+    audience: Procurement managers and buyers
+    system_prompt: >-
+      Help procurement users find concise, evidence-backed supplier and
+      purchase-order information. Answer only from tool results; when data is
+      unavailable, say so instead of guessing.
+    tools:
+      - name: lookup_supplier
+        description: Look up a supplier's master data and status by identifier.
+        parameters:
+          - name: supplier_id
+            type: string
+            description: Supplier identifier.
+        returns: SupplierSummary
+        backend: mock
+      - name: lookup_purchase_order
+        description: Fetch a purchase order with items, values, and delivery status.
+        parameters:
+          - name: purchase_order_id
+            type: string
+            description: Purchase order number.
+        returns: PurchaseOrderSummary
+        backend: mock
+    skills:
+      - id: supplier-lookup
+        name: Supplier Lookup
+        description: Finds supplier details and purchase-order status.
+        tags: [supplier, procurement]
+        examples:
+          - Show supplier 1000123.
+          - What is the delivery status of PO 4500098765?
