@@ -81,28 +81,35 @@ plain free text for genuinely open content that no suggestion can cover.
 - Probe the session before asking anything: run `./cookbookctl accounts --json`
   first. It is read-only, needs no manifest, and doubles as the login check —
   when no BTP CLI session exists it exits 1 with that finding; when one exists it
-  reports the session's global account, every visible subaccount, and — when a
-  manifest exists — whether its subdomain is `new`, `resume`, or `collision`.
+  reports the session's global account and every visible subaccount. When a
+  manifest exists, it also assesses that manifest's own subdomain as `available`
+  (free to create) or `already-exists` (the subdomain is taken).
 - Only when the probe reports no session, ask the user to authenticate
   themselves with `btp login --sso`, then rerun the discovery. Never ask an
   already-logged-in user to log in, and never accept passwords, tokens, service
   keys, certificates, or API keys in chat or `pilot.yaml`.
+- The visible subaccount list is raw BTP inventory, not a list of pilots this
+  workspace owns. Resume applies only to workspace-managed pilots surfaced by
+  `./cookbookctl pilots --json` (see **Start or resume**). Never present an
+  existing BTP subaccount as a pilot to resume — the account list proves only
+  that a subdomain exists, not that this workspace created or manages it.
 - When a session exists, open with one targeting chooser built from the
   discovery output — "You are targeting **<display name>** (subdomain `<x>`).
-  Use one of the following subaccounts, or create a new one?" — with structured
-  options:
-  - each subaccount annotated with a manifest role (or assessed `resume`) →
-    **resume that pilot**;
+  Create a new subaccount, or resume a workspace-managed pilot?" — with
+  structured options:
   - **Create a new subaccount** (recommended default): collect display name,
     subdomain, BTP region, administrators, and production relevance; propose a
-    subdomain that does not collide with the listed ones.
+    subdomain that does not collide with any visible subaccount.
+  - **Resume a workspace-managed pilot** — offer this only for the active or
+    parked pilots reported by `pilots --json`, never for a bare subaccount row.
   - If the targeted global account is wrong, ask the user to rerun
     `btp login --sso`, select the intended account during login, and rerun the
     discovery; a CLI session is bound to one global account at a time. Prefill
     `account.global_account_subdomain` from the session.
-- A `collision` assessment means the subdomain already exists but is not managed
-  by this manifest. Report it to the user and pick a non-colliding subdomain;
-  do not reuse it silently.
+- Treat every visible subaccount as a collision to avoid: when a chosen new
+  subdomain matches one — the probe reports `already-exists` for the manifest
+  subdomain — report it and pick a non-colliding subdomain. Do not reuse or adopt
+  an existing subaccount; the public flow has no adoption path.
 
 ### 3. Runtime
 
