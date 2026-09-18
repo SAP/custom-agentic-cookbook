@@ -75,6 +75,12 @@ List the available skills without installing them:
 npx skills add SAP/custom-agentic-cookbook --list
 ```
 
+To start a pilot, invoke the `sap-setup-btp-agent` skill in a supported harness:
+it runs a guided interview, captures every material architecture choice, and
+writes a credential-free `pilot.yaml`. Then check it locally with
+`./cookbookctl validate` and `./cookbookctl render` — see the
+[coordinator guide](docs/cookbookctl.md).
+
 ## Available recipes
 
 Use these optional recipes when the core path needs another capability:
@@ -102,6 +108,7 @@ Use these optional recipes when the core path needs another capability:
 | [`sap-joule-capability`](skills/sap-joule-capability/) | Joule capability bundles for code-based agents |
 | [`sap-kyma-cli`](skills/sap-kyma-cli/) | Kyma deployment patterns used by the Cookbook |
 | [`sap-repair-joule-access`](skills/sap-repair-joule-access/) | Joule CLI authentication and authorization troubleshooting |
+| [`sap-setup-btp-agent`](skills/sap-setup-btp-agent/) | Guided interview that produces a validated, credential-free `pilot.yaml` |
 | [`sap-sovereign-regions`](skills/sap-sovereign-regions/) | Region-specific model and service guardrails |
 
 For detailed selection guidance, see the [skills catalog](skills/README.md).

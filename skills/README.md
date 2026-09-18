@@ -16,6 +16,7 @@ Only the **CoE-original `sap-*` skills** live here. For the general SAP-authored
 | [`sap-repair-joule-access`](sap-repair-joule-access/SKILL.md) | Joule | Diagnosing Joule CLI login and capability-deployment authorization failures |
 | [`sap-sovereign-regions`](sap-sovereign-regions/SKILL.md) | Sovereign | Model and service availability guardrails for China Landing, NS2, KSA, EU Access, and regular BTP regions |
 | [`sap-kyma-cli`](sap-kyma-cli/SKILL.md) | CLI | Kyma deployment patterns specific to the templates here |
+| [`sap-setup-btp-agent`](sap-setup-btp-agent/SKILL.md) | Setup | Guided pilot intake: choosing CF vs Kyma, HANA vs in-memory, AI Core vs OpenAI-compatible, optional Joule, and writing/validating/rendering `pilot.yaml` |
 
 ## Upstream catalog on [skills.cloud.sap](https://skills.cloud.sap/)
 

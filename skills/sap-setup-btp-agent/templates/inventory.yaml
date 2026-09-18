@@ -1,0 +1,43 @@
+scenario:
+  id: inventory
+  title: Inventory assistant
+  summary: Material stock levels and availability across plants.
+  eventual_system: SAP S/4HANA Inventory Management (OData API_MATERIAL_STOCK_SRV)
+
+agent:
+  name: inventory-assistant
+  purpose: Look up material stock levels and availability across plants.
+  spec:
+    audience: Warehouse coordinators and supply planners
+    system_prompt: >-
+      Help logistics users find concise, evidence-backed material stock and
+      availability information. Answer only from tool results; when data is
+      unavailable, say so instead of guessing.
+    tools:
+      - name: lookup_material_stock
+        description: Fetch stock quantity and availability for a material, optionally per plant.
+        parameters:
+          - name: material_id
+            type: string
+            description: Material number.
+          - name: plant_id
+            type: string
+            description: Optional plant to scope the stock query.
+        returns: MaterialStockSummary
+        backend: mock
+      - name: list_low_stock_materials
+        description: List materials below their safety-stock threshold in a plant.
+        parameters:
+          - name: plant_id
+            type: string
+            description: Plant identifier.
+        returns: MaterialStockList
+        backend: mock
+    skills:
+      - id: inventory-lookup
+        name: Inventory Lookup
+        description: Finds material stock levels and low-stock alerts by plant.
+        tags: [inventory, materials]
+        examples:
+          - How much of material MAT-100 is in plant 1010?
+          - Which materials are running low in plant 1010?
