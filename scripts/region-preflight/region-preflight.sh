@@ -3,10 +3,11 @@
 #
 # Accepts loose input and resolves it to one or more canonical Discovery Center
 # region labels:
-#   - BTP CLI landscape codes:   eu10, eu11, eu20, eu30, us10, us20, us21, us30,
-#                                ap10, ap11, ap12, ap20, ap21, jp10, jp20,
-#                                ca10, ca20, br10, br20, in30, cn40, cn41,
-#                                sa30, sa31, ch20, il30, ae10
+#   - BTP CLI landscape codes:   eu10, eu11, eu13, eu20, eu30, us01, us02, us10,
+#                                us11, us20, us21, us30, ap10, ap11, ap12, ap20,
+#                                ap21, ap30, jp10, jp20, jp30, ca10, ca20, br10,
+#                                br20, in30, cn20, cn40, sa30, sa31, ch20, il30,
+#                                ae01
 #   - Short aliases:             eu, europe, us, america, usa, asia, ap, china,
 #                                cn, prc, ksa, sa, saudi, japan, jp, india, in,
 #                                brazil, br, canada, ca, australia, au, korea,
@@ -66,39 +67,48 @@ norm_input="$(printf '%s' "$REGION_INPUT" | tr '[:upper:]' '[:lower:]' | sed -E 
 
 # ---------------------------------------------------------------------------
 # Landscape-shortcut → exact Discovery Center label.
-# Source: BTP CLI `btp list accounts/available-region` cross-referenced with
-# Discovery Center's RegionDataCenter field. When SAP adds landscapes, extend
-# this case.
+# Sources: the landscape-code ↔ physical-region pairing comes from SAP Help
+# "Regions and API Endpoints Available for the Cloud Foundry Environment" (the
+# code is the CF API-endpoint subdomain, so each row is self-identifying); the
+# label string is the verbatim Discovery Center RegionDataCenter key, so the
+# availability lookup below matches with grep -Fxq. When SAP adds landscapes,
+# extend this case.
 # ---------------------------------------------------------------------------
 landscape_to_label() {
   case "$1" in
     eu10) echo "Europe (Frankfurt)" ;;
     eu11) echo "Europe (Frankfurt) EU Access" ;;
+    eu13) echo "Europe (Milan)" ;;
     eu20) echo "Europe (Netherlands)" ;;
     eu30) echo "Europe (Frankfurt) SAP EU Access" ;;
+    us01) echo "US (Sterling)" ;;
+    us02) echo "US West (Colorado)" ;;
     us10) echo "US East (VA)" ;;
-    us20) echo "US Central (IA)" ;;
-    us21) echo "US West (WA)" ;;
-    us30) echo "US (Sterling)" ;;
-    ap10) echo "Singapore" ;;
-    ap11) echo "Australia (Sydney)" ;;
-    ap12) echo "Australia Southeast (Sydney)" ;;
-    ap20) echo "Japan (Tokyo)" ;;
-    ap21) echo "South Korea (Seoul)" ;;
+    us11) echo "US West (Oregon)" ;;
+    us20) echo "US West (WA)" ;;
+    us21) echo "US East (VA)" ;;
+    us30) echo "US Central (IA)" ;;
+    ap10) echo "Australia (Sydney)" ;;
+    ap11) echo "Singapore" ;;
+    ap12) echo "South Korea (Seoul)" ;;
+    ap20) echo "Australia (Sydney)" ;;
+    ap21) echo "Singapore" ;;
+    ap30) echo "Australia Southeast (Sydney)" ;;
     jp10) echo "Japan (Tokyo)" ;;
-    jp20) echo "Japan (Osaka)" ;;
+    jp20) echo "Japan (Tokyo)" ;;
+    jp30) echo "Japan (Osaka)" ;;
     ca10) echo "Canada (Montreal)" ;;
     ca20) echo "Canada (Toronto)" ;;
     br10) echo "Brazil (São Paulo)" ;;
     br20) echo "Brazil South" ;;
     in30) echo "India (Mumbai)" ;;
+    cn20) echo "China (North 3)" ;;
     cn40) echo "China (Shanghai)" ;;
-    cn41) echo "China (North 3)" ;;
     sa30) echo "KSA (Dammam – KSA Regulated Customers)" ;;
     sa31) echo "KSA (Dammam – KSA Non-Regulated Customers)" ;;
     ch20) echo "Switzerland (EU Access)" ;;
     il30) echo "Israel (Tel Aviv)" ;;
-    ae10) echo "UAE (Dubai)" ;;
+    ae01) echo "UAE (Dubai)" ;;
     *) return 1 ;;
   esac
 }

@@ -104,38 +104,38 @@ render_group "Europe" \
   "Frankfurt EU Access (\`eu11\`)"        "Europe (Frankfurt) EU Access" \
   "Frankfurt SAP EU Access (\`eu30\`)"    "Europe (Frankfurt) SAP EU Access" \
   "Netherlands (\`eu20\`)"                "Europe (Netherlands)" \
-  "Milan"                                 "Europe (Milan)" \
+  "Milan (\`eu13\`)"                      "Europe (Milan)" \
   "Rot SAP EU Access"                     "Europe (Rot) SAP Cloud Infrastructure EU Access" \
   "Switzerland EU Access (\`ch20\`)"      "Switzerland (EU Access)"
 
 render_group "Americas" \
-  "US East VA (\`us10\`)"       "US East (VA)" \
-  "US Central IA (\`us20\`)"    "US Central (IA)" \
-  "US West WA (\`us21\`)"       "US West (WA)" \
-  "US West Oregon"              "US West (Oregon)" \
-  "US West Colorado"            "US West (Colorado)" \
-  "US Sterling (\`us30\`)"      "US (Sterling)" \
-  "Canada Montreal (\`ca10\`)"  "Canada (Montreal)" \
-  "Canada Toronto (\`ca20\`)"   "Canada (Toronto)" \
-  "Brazil São Paulo (\`br10\`)" "Brazil (São Paulo)" \
-  "Brazil South (\`br20\`)"     "Brazil South"
+  "US East VA (\`us10\`/\`us21\`)"     "US East (VA)" \
+  "US Central IA (\`us30\`)"           "US Central (IA)" \
+  "US West WA (\`us20\`)"              "US West (WA)" \
+  "US West Oregon (\`us11\`)"          "US West (Oregon)" \
+  "US West Colorado (\`us02\`)"        "US West (Colorado)" \
+  "US Sterling (\`us01\`)"             "US (Sterling)" \
+  "Canada Montreal (\`ca10\`)"         "Canada (Montreal)" \
+  "Canada Toronto (\`ca20\`)"          "Canada (Toronto)" \
+  "Brazil São Paulo (\`br10\`)"        "Brazil (São Paulo)" \
+  "Brazil South (\`br20\`)"            "Brazil South"
 
 render_group "Asia-Pacific" \
-  "Singapore (\`ap10\`)"                  "Singapore" \
-  "Japan Tokyo (\`ap20\`/\`jp10\`)"       "Japan (Tokyo)" \
-  "Japan Osaka (\`jp20\`)"                "Japan (Osaka)" \
-  "South Korea Seoul (\`ap21\`)"          "South Korea (Seoul)" \
-  "Australia Sydney (\`ap11\`)"           "Australia (Sydney)" \
-  "Australia SE Sydney (\`ap12\`)"        "Australia Southeast (Sydney)" \
+  "Singapore (\`ap11\`/\`ap21\`)"         "Singapore" \
+  "Japan Tokyo (\`jp10\`/\`jp20\`)"       "Japan (Tokyo)" \
+  "Japan Osaka (\`jp30\`)"                "Japan (Osaka)" \
+  "South Korea Seoul (\`ap12\`)"          "South Korea (Seoul)" \
+  "Australia Sydney (\`ap10\`/\`ap20\`)"  "Australia (Sydney)" \
+  "Australia SE Sydney (\`ap30\`)"        "Australia Southeast (Sydney)" \
   "India Mumbai (\`in30\`)"               "India (Mumbai)"
 
 render_group "Sovereign / regulated" \
-  "UAE Dubai (\`ae10\`)"                        "UAE (Dubai)" \
+  "UAE Dubai (\`ae01\`)"                        "UAE (Dubai)" \
   "Israel Tel Aviv (\`il30\`)"                  "Israel (Tel Aviv)" \
   "KSA Dammam Regulated (\`sa30\`)"             "KSA (Dammam – KSA Regulated Customers)" \
   "KSA Dammam Non-Reg. (\`sa31\`)"              "KSA (Dammam – KSA Non-Regulated Customers)" \
   "China Shanghai (\`cn40\`)"                   "China (Shanghai)" \
-  "China North 3 (\`cn41\`)"                    "China (North 3)"
+  "China North 3 (\`cn20\`)"                    "China (North 3)"
 
 # Coverage summary — count and gaps per service across the 30-region universe.
 total=$(wc -l < "$UNIVERSE" | tr -d ' ')
