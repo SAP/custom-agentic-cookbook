@@ -14,12 +14,28 @@ deployments.
 
 SAP BTP services and model availability vary by region, particularly in
 sovereign and regulated environments. This Cookbook provides a practical path
-from a local prototype to deployment on Cloud Foundry or Kyma and, where
-available, integration with Joule.
+from a local prototype to deployment on Cloud Foundry or Kyma. Where available,
+it also documents integration with Customer-Managed Joule (CMJ). CMJ means
+that customers provision and configure Joule.
 
 Each recipe identifies its prerequisites, regional considerations, validation
 steps, and optional alternatives so teams can choose only the capabilities
 their environment supports.
+
+### Joule support status
+
+Bring Your Own Agent (BYOA) connects a code-based agent to Joule. The current
+Cookbook flow documents BYOA only through CMJ.
+
+| Provisioning model | Agent path | Cookbook status |
+| --- | --- | --- |
+| [Customer-Managed Joule (CMJ)](https://help.sap.com/docs/JOULE/6189c8655c484916bb8eb767126a653a/3d94330d4a8042e88ba75687a920f1ce.html) | Bring Your Own Agent (BYOA) | Current documented path. The Joule checkpoint, Joule Studio CLI, and SAP BTP destination instructions use this model. |
+| [SAP-Managed Joule (SMJ)](https://help.sap.com/docs/JOULE/621104a90a01407fbb2d1613db39a54d/270e784360a347678c548b9908f54056.html) | Joule Studio agents | Not supported by this Cookbook. Do not use the current Joule checkpoint for this path. |
+| [SAP-Managed Joule (SMJ)](https://help.sap.com/docs/JOULE/621104a90a01407fbb2d1613db39a54d/270e784360a347678c548b9908f54056.html) | Third-party agents | Not supported by this Cookbook. Do not use the current Joule checkpoint for this path. |
+
+This table describes support in this repository. It does not describe every
+SAP product capability. Read SAP Help for the current product scope and
+restrictions.
 
 ## Get started
 
@@ -36,7 +52,7 @@ Follow the core path in order:
 | --- | --- | --- |
 | 1 | [Scaffold and run an agent locally](recipes/01-scaffold-agent/) | A supported coding agent and an LLM endpoint |
 | 2 | [Deploy the agent on SAP BTP](recipes/02-deploy-btp/) | A subaccount with Cloud Foundry or Kyma |
-| 3 | [Connect the agent to Joule](recipes/03-joule/) | A Joule-enabled tenant in a supported region |
+| 3 | [Connect the agent to Customer-Managed Joule (CMJ)](recipes/03-joule/) | A customer-managed Joule tenant in a supported region |
 
 Checkpoint 1 uses mock data and does not require an SAP BTP account. For the
 complete flow and its dependencies, see the [recipe guide](recipes/README.md).
