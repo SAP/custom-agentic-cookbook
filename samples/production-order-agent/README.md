@@ -71,6 +71,19 @@ uv run --frozen python scripts/smoke_mcp.py
 
 ## Verify the A2A business flow
 
+From this sample directory, assert the completed mock business reply:
+
+```bash
+uv run --frozen python scripts/smoke_a2a.py
+```
+
+Use this command with `DATA_MODE=mock` and `LLM_PROVIDER=mock`. It requires
+both status records and operation numbers for order `1000000`. It exits with
+an error if the task fails or those records are missing. To select a different
+local A2A port, add `--base-url http://127.0.0.1:<port>`.
+
+The manual request below shows the same message envelope.
+
 Fetch the Agent Card:
 
 ```bash

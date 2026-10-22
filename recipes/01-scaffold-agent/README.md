@@ -1,183 +1,205 @@
 ---
-title: "Scaffold your agent — toolkit driver + a running A2A agent with mock data"
+title: "Run a local production-order agent"
 sap-services: []
 complexity: recipe
-last-validated: 2026-07-10
-changes-under-baip: "The scaffolder's `--llm-provider` flag is the port-back boundary: when BAIP is GA in-region, swap the provider without touching the A2A endpoint, Joule capability bundle, or project shape."
+last-validated: 2026-10-22
+validation-status: "Local and Docker Compose mock A2A-to-MCP flow passed on macOS. No BTP or live backend proof."
 ---
 
-# 01 · Scaffold your agent
+# 01 · Run your agent locally
 
-> **Guided:** checkpoint 1 — `/start` runs this end-to-end. Mid-flow prompt: *"Set up the toolkit and scaffold my agent — here's what it should do: …"*
-> **Flow:** first checkpoint — no upstream step. Hands off to **[02-deploy-btp](../02-deploy-btp/)**; connect live data anytime via **[optional/connect-data](../optional/connect-data/)**.
-> **Input:** a laptop with Claude Code (or an MCP-capable harness) and **one LLM endpoint** — an SAP AI Core instance with a deployed model, or any OpenAI-compatible endpoint (base URL + key). **No BTP account needed.**
-> **Output:** your agent project (worked example: `sales-order-agent/`) running on `localhost:8080` and replying to real messages **with mock data** — consumed by **02-deploy-btp**, and by **optional/connect-data** when you want a live backend.
-> **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent <name> --prompt "…"`.
+This recipe starts the checked-in Python production-order agent. It answers a
+production planner with mock order status and operations. No BTP account,
+model endpoint, or credentials are required.
 
-Install the toolkit driver, scaffold *your* agent, run it locally, and talk to it. The generated tools return **mock data** (TODO-marked bodies tailored to your purpose), so the agent converses and demos end-to-end without touching any backend system. Everything in this checkpoint happens on your laptop — BTP, entitlements, and the region question all wait until [02-deploy-btp](../02-deploy-btp/); live business data is an opt-in via [optional/connect-data](../optional/connect-data/).
+A2A carries messages between clients and agents. MCP connects the agent to its
+business tools. This sample uses A2A v1.0 and two MCP tools.
 
-For a credential-free look at the underlying protocol server without an LLM or
-generated business tools, see the experimental
-[`fde-a2a-minimal`](../../samples/fde-a2a-minimal/) Python A2A v1.0 smoke. It is
-supporting reference material and does not replace this checkpoint.
+The input is a clean Cookbook clone and the tools listed below. The output is
+the production-order agent at `http://127.0.0.1:8000` with a working MCP server.
+The reply for order `1000000` completes this local checkpoint.
 
-## 1. Local prerequisites
+## When to use it
 
-| Tool | Version | Why |
-|---|---|---|
-| Claude Code — or one of {Codex, Cursor, OpenCode, Gemini CLI, Cline} | current | Runs the toolkit. The Claude Code plugin is the default driver; the MCP server and raw shell scripts are the alternatives. |
-| Node.js | **24.x** | TypeScript agents (Express or CAP). |
-| Python | **3.12+** | Only if you scaffold `--lang python`. |
+Use this recipe to learn the agent-to-tool flow before selecting a model or
+connecting business data. The checked-in starter works from a terminal or any
+coding harness. It does not require a scaffold plugin or MCP harness driver.
 
-**Windows:** use WSL2 with Ubuntu and install Claude Code plus the selected scaffold runtime inside WSL. Follow [Windows + WSL2 setup](../../docs/windows-wsl2.md) before continuing; do not run the cookbook from native PowerShell, Command Prompt, or Git Bash.
+This path uses Python and an in-memory task store. Start one agent process.
+Task state disappears when that process stops. The protocol-only
+[minimal sample](../../samples/fde-a2a-minimal/) remains a separate example.
 
-**Not needed yet:** `cf` / `btp` CLIs, Joule Studio CLI, `mbt` — those enter at [02-deploy-btp](../02-deploy-btp/). No S/4HANA or other backend either — the scaffold ships mock data.
+## Prerequisites
 
-One command checks all of this and prints the fix for anything missing: `bash scripts/doctor/doctor.sh` (from the Cookbook root).
+Install Python 3.12 or newer, below Python 3.15. Install
+[`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+Make sure that local ports `8000` and `8090` are available. Docker with Compose
+is required only for the container path.
 
-## 2. Install the toolkit driver
+Use macOS or Linux for this tested path. On Windows, use a Linux environment
+and these same shell commands. Native Windows behavior is outside this proof.
 
-### Driver A — Claude Code plugin (default)
-
-```bash
-# From the Cookbook root — clone the toolkit into toolkits/a2a-agent-toolkit, then launch Claude Code with the plugin:
-git clone https://github.com/SAP-samples/joule-a2a-agent-toolkit.git toolkits/a2a-agent-toolkit
-claude --plugin-dir toolkits/a2a-agent-toolkit
-```
-
-The `--plugin-dir` flag loads the toolkit for that session and needs no prompt. To have plain `claude` from the repo root load it automatically in later sessions, add a `.claude/settings.json` pointing at the plugin directory.
-
-Verify: type `/` — the `sap-a2a-agent-toolkit:` commands (`create-agent`, `deploy-agent`, `create-destination`) appear in the list. If they don't, see [Troubleshooting](#6-troubleshooting).
-
-<details>
-<summary>Driver B — MCP server · Driver C — raw shell scripts</summary>
-
-**MCP server** (Codex, Cursor, OpenCode, Gemini CLI, Cline) — the package is
-not published and must be built from the vendored submodule:
+Clone the Cookbook:
 
 ```bash
-git submodule update --init toolkits/a2a-agent-toolkit
-./scripts/build-toolkit-mcp.sh
+git clone https://github.com/SAP/custom-agentic-cookbook.git
+cd custom-agentic-cookbook
 ```
 
-Then configure the harness to spawn the absolute path to
-`scripts/start-toolkit-mcp.sh`. For example, Codex uses
-`~/.codex/config.toml`:
+## Scaffold
 
-```toml
-[mcp_servers.sap_a2a_toolkit]
-command = "/absolute/path/to/Cookbook/scripts/start-toolkit-mcp.sh"
-```
+Use the public [production-order starter](../../samples/production-order-agent/)
+as the project. No code generation is required.
 
-The harness starts this local stdio process; it is not a hosted service. Launch
-the harness from the target workspace so generated projects land there. See
-[`docs/harnesses.md`](../../docs/harnesses.md) for all supported harness
-configurations.
-
-**Shell scripts** (CI, air-gapped laptops, no LLM in the loop) — documented in `SCRIPTS.md` (in the A2A Agent Toolkit plugin):
+From the Cookbook root, install the locked sample dependencies:
 
 ```bash
-bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/scaffold-ts.sh --help   # TypeScript
-python toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/scaffold.py --help    # Python
+cd samples/production-order-agent
+uv sync --frozen --group dev
 ```
 
-All three drivers produce byte-identical projects for the same inputs.
+If you adapt the starter, keep the tool names and A2A protocol unchanged until
+the smoke tests pass. Toolkit generation and deployment automation are outside
+this recipe's tested scope.
 
-</details>
+## Configure
 
-## 3. Scaffold your agent
+Keep `DATA_MODE=mock` and `LLM_PROVIDER=mock` for this checkpoint. The two tools
+return synthetic records for order `1000000`. The agent calculates its summary
+from those records. No model generates this baseline reply.
 
-In the selected coding-agent session, describe what you want—the prompt is the
-interface:
-
-> Scaffold a new A2A agent named `<name>` with LLM provider `<aicore|openai-compatible>`. Purpose: <one sentence — what it does and for whom>.
-
-The harness runs the toolkit's `create-agent` flow with the prompt, which
-tailors the system prompt, tools, and AgentCard skills to your purpose (you'll
-get a short spec summary to confirm before it generates). The emitted tools
-carry mock data matched to the purpose—swapping them for a live backend is
-[optional/connect-data](../optional/connect-data/). The worked example used
-throughout this cookbook is `sales-order-agent`—purpose: *"answer questions
-about S/4HANA sales orders for sales teams"*—but use your own.
-
-Pick the provider by what you have: `aicore` if you have an AI Core instance with a deployed model, `openai-compatible` for any other endpoint (also the required path in sovereign regions without AI Core — see [`../optional/sovereign-model-gateway/`](../optional/sovereign-model-gateway/), which you can wire later).
-
-**Stacks — the toolkit offers exactly three.** If you don't say otherwise, you get the default:
-
-| Stack | When |
-|---|---|
-| **TypeScript + Express** (default) | Lightest scaffold, in-memory task store — right for most pilots. |
-| **TypeScript + CAP** | CAP/MTA project shape — required for the durable HANA task store, natural for CAP shops. |
-| **Python** (`--lang python`) | The four-file a2a-sdk/uvicorn shape — pick it when your team extends agents in Python. (The toolkit's interview labels this "Python + Express"; there's no Express involved.) |
-
-**Heading to production?** Add one line to the prompt — *"use a durable HANA task store so multi-turn conversations survive restarts"* — and Claude scaffolds the CAP + MTA variant (`--framework cap --taskstore hana`) instead of in-memory Express. Everything downstream works the same; the HANA entitlement is verified at [02-deploy-btp](../02-deploy-btp/).
-
-<details>
-<summary>Other drivers — equivalent invocations</summary>
-
-**MCP:** *"Use the sap-a2a-toolkit MCP to scaffold a TypeScript Express A2A agent named `<name>` with LLM provider `<aicore|openai-compatible>`. Purpose: `<purpose>`."*
-
-**Shell script:**
+In a terminal at `samples/production-order-agent`, start the MCP server:
 
 ```bash
-bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/scaffold-ts.sh \
-  --name <name> \
-  --framework express \
-  --llm-provider <aicore|openai-compatible>
+DATA_MODE=mock MCP_HOST=127.0.0.1 MCP_PORT=8090 \
+  uv run --frozen python -m production_order_agent.mcp_server
 ```
 
-</details>
-
-## 4. Provide model credentials and run it
-
-Export the env vars **the generated code actually reads** — check the scaffold's `.env.example`:
+In a second terminal at the same directory, start the A2A agent:
 
 ```bash
-# aicore: the AI Core service-key vars the scaffold lists
-# openai-compatible (toolkit ≥ v0.6.0):
-export MODEL_GATEWAY_URL=https://<your-endpoint>/v1
-export MODEL_GATEWAY_API_KEY=<secret>        # never commit; never paste into chat
-export MODEL_NAME=<model-or-deployment-name>
-
-cd <name>
-npm install && npm start                     # Python: pip install -r requirements.txt && python .
-# serves on http://localhost:8080
+HOST=127.0.0.1 PORT=8000 URL=http://127.0.0.1:8000 \
+MCP_SERVER_URL=http://127.0.0.1:8090/sse LLM_PROVIDER=mock \
+  uv run --frozen python -m production_order_agent
 ```
 
-## 5. Verify it works — the chat proof
+Both endpoints remain on your workstation. Neither endpoint provides
+application authentication. Do not expose them to other users or networks.
+
+## Deploy
+
+For an optional local container run, stop the two terminal processes first.
+Keep the same working directory. Start the two Compose services in mock mode:
 
 ```bash
-# 1. Agent Card resolves (path per the scaffold's a2a-sdk version — check the generated code):
-curl -s http://localhost:8080/.well-known/agent.json | jq .name
-# expect: "<name>"
-
-# 2. Readiness check, from the Cookbook root:
-BASE_URL=http://localhost:8080 AGENT_CARD_PATH=/.well-known/agent.json \
-  python3 references/gitops-workflows/scripts/smoke-a2a.py
+DATA_MODE=mock LLM_PROVIDER=mock docker compose up --build
 ```
 
-Then send one real message—in the coding-agent session, ask: *"Send the running
-agent a test message ('introduce yourself') and show me its reply."* The harness
-derives the JSON-RPC envelope from the scaffolded code. Ask it something
-in-domain too ("which sales orders are open?")—it answers from the mock data,
-which is exactly right at this checkpoint. **The reply—not the Agent Card—is
-checkpoint 1.**
+Compose binds both ports to `127.0.0.1`. The agent calls the MCP service over
+the Compose network. Both containers run as UID/GID `10001`.
 
-## 6. Troubleshooting
+BTP deployment is a separate checkpoint. The
+[deployment recipe](../02-deploy-btp/) still contains paths that need separate
+support and live evidence. Do not treat local container proof as BTP proof.
 
-**Plugin commands not discovered (`/sap-a2a-agent-toolkit:create-agent` unknown).** The plugin didn't load. Most common cause: the toolkit isn't cloned yet — run `git clone https://github.com/SAP-samples/joule-a2a-agent-toolkit.git toolkits/a2a-agent-toolkit`, then relaunch with `claude --plugin-dir toolkits/a2a-agent-toolkit`. If `toolkits/a2a-agent-toolkit` already exists but is empty, delete it and re-clone.
+## Verify it works
 
-**MCP server absent from the assistant's tool list.** Run
-`./scripts/build-toolkit-mcp.sh`, verify the harness command is the absolute path
-to `scripts/start-toolkit-mcp.sh`, and restart or reload the harness. Do not use
-the unpublished `@sap/a2a-toolkit-mcp` package through `npx`. Per-harness paths
-and reload behavior are documented in
-[`docs/harnesses.md`](../../docs/harnesses.md).
+In a third terminal at `samples/production-order-agent`, list the MCP tools:
 
-**Agent starts but replies with a model/auth error.** The env vars don't match what the scaffold reads — compare your exports against the generated `.env.example` (v0.6.0 sovereign scaffolds read `MODEL_GATEWAY_URL` / `MODEL_GATEWAY_API_KEY`; older ones read `OPENAI_BASE_URL` / `OPENAI_API_KEY`).
+```bash
+uv run --frozen python scripts/smoke_mcp.py
+```
 
-**Something else.** File a *cookbook gap* issue: [`.github/ISSUE_TEMPLATE/cookbook-gap.yml`](../../.github/ISSUE_TEMPLATE/cookbook-gap.yml).
+The result contains exactly `get_production_order_status` and
+`get_production_order_operations`.
+
+Send a real A2A message and assert its business reply:
+
+```bash
+uv run --frozen python scripts/smoke_a2a.py
+```
+
+The command asks why production order `1000000` is delayed. It requires a
+completed task with both status records and both operation numbers. The reply
+shows `Released`, `Partially Confirmed`, `0010`, and `0020`. Operation `0020`
+has a past scheduled end date and remains unconfirmed, so the reply reports a
+potential delay.
+
+A successful Agent Card request alone does not complete this checkpoint.
+The smoke command exits with an error if the A2A task fails or the expected
+business records are missing. It uses mock order `1000000`, so use it only
+with `DATA_MODE=mock` and `LLM_PROVIDER=mock`.
+
+If you use different local ports, pass both explicit URLs:
+
+```bash
+uv run --frozen python scripts/smoke_mcp.py --server-url http://127.0.0.1:8091/sse
+uv run --frozen python scripts/smoke_a2a.py --base-url http://127.0.0.1:8001
+```
+
+Set `MCP_PORT` for the MCP server to the new port.
+Set `MCP_SERVER_URL` for the agent to that port and `/sse` path.
+Set `PORT` and `URL` for the agent to the new A2A port.
+
+Run the sample tests and formatting checks:
+
+```bash
+uv run --frozen --group dev pytest
+uv run --frozen --group dev ruff check .
+uv run --frozen --group dev ruff format --check .
+```
+
+## Troubleshooting
+
+If the agent returns a failed task, make sure that the MCP process is running.
+Make sure that `MCP_SERVER_URL` matches its port and `/sse` path. Repeat the
+MCP smoke command before repeating the A2A message.
+
+If a process reports that its port is occupied, stop your earlier sample
+process or select an unused port. Update all corresponding URLs. Do not stop
+an unrelated process.
+
+If the business smoke fails, make sure that both providers remain in mock
+mode. The sample has one mock order, `1000000`. An unknown order returns a
+failed task instead of invented records.
+
+If model credentials are requested, make sure that `LLM_PROVIDER=mock` reaches
+the agent process. Model integration is optional and outside this checkpoint.
+
+## Cleanup or rollback
+
+For terminal runs, press `Ctrl+C` in each server terminal. This stops the agent
+and its MCP server. The virtual environment can remain for the next recipe.
+
+For the container path, stop Compose and remove the sample containers:
+
+```bash
+docker compose down
+```
+
+No BTP resources, business records, or model deployments are created by this
+recipe.
+
+## Region-specific notes
+
+The local mock flow has no regional service dependency. Before selecting
+AI Core or deploying in an unfamiliar region, use
+[region preflight](../optional/region-preflight/).
+
+## Changes under BAIP
+
+This local checkpoint makes no assumption about future platform services.
+Retain the A2A endpoint and tool boundary when changing the model provider.
+Test the new provider before describing it as supported.
 
 ## Next
 
-Deploy it — [02-deploy-btp](../02-deploy-btp/). Want live business data first (or after deploying)? [optional/connect-data](../optional/connect-data/) swaps the mock tools for a real backend — S/4HANA via the free api.sap.com sandbox if you don't have a tenant.
+Use [connect-data](../optional/connect-data/) when a live backend is required.
+Its current instructions still describe a different sales-order example.
+The [production-order sample guide](../../samples/production-order-agent/)
+contains the existing public production-order sandbox path.
+
+The [sovereign gateway recipe](../optional/sovereign-model-gateway/) requires a
+provider path beyond this mock baseline. Public toolkit MCP drivers, CAP,
+durable HANA state, and automatic project generation are outside this local
+checkpoint.
