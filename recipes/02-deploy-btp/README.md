@@ -29,8 +29,9 @@ changes-under-baip: "Service-binding shape may change to BAIP-native bindings; C
 # 02 · Deploy on BTP — Cloud Foundry or Kyma
 
 > **Guided:** checkpoint 2 — the **first step that needs a BTP account**. `/start` runs the subaccount checks here, derives the landscape from your subaccount, and routes sovereign regions through the model gateway automatically. Mid-flow prompt: *"Deploy my agent to BTP."*
-> **Flow:** happy-path convergence point — accepts the output of **[01-scaffold-agent](../01-scaffold-agent/)** (default, mock data), **[optional/connect-data](../optional/connect-data/)**, **[optional/sovereign-model-gateway](../optional/sovereign-model-gateway/)**, **[optional/bring-your-own-model](../optional/bring-your-own-model/)**, or the **optional/** RAG / KG variants. Hands off to **[03-joule](../03-joule/)** and **[optional/observe-and-eval](../optional/observe-and-eval/)**.
-> **Input:** the agent project from **01-scaffold-agent** (its Output) — any toolkit-scaffolded shape, task store chosen, `--llm-provider` set. Mock data deploys fine; live data via optional/connect-data can come before or after.
+> **Flow:** happy-path convergence point — accepts the output of **[01-scaffold-agent](../01-scaffold-agent/)** (default, mock data), **[optional/sovereign-model-gateway](../optional/sovereign-model-gateway/)**, **[optional/bring-your-own-model](../optional/bring-your-own-model/)**, or the **optional/** RAG / KG variants. Hands off to **[03-joule](../03-joule/)** and **[optional/observe-and-eval](../optional/observe-and-eval/)**.
+> **Input:** the agent project from **01-scaffold-agent** (its Output) — any toolkit-scaffolded shape, task store chosen, `--llm-provider` set. Mock data deploys through this path.
+> The standalone [connect-data](../optional/connect-data/) recipe uses a separate Python sample and does not provide this deployment handoff.
 > **Output:** a deployed A2A agent URL — `<agent>.cfapps.<landscape>.hana.ondemand.com` (CF) or `<agent>.<cluster-domain>` (Kyma) — with the Agent Card reachable, consumed by **03-joule** (Joule wiring) and **optional/observe-and-eval** (observability).
 > **Toolkit command:** `/sap-a2a-agent-toolkit:deploy-agent` (drives `cf push` + MTA on CF, or Helm + APIRule v2 on Kyma).
 
@@ -64,7 +65,7 @@ No subaccount yet? The reusable [`infra/btp/`](../../infra/btp/) Terraform accou
 | **CF environment** enabled + one org/space (or **Kyma runtime**) | **always — the only hard requirement** | `btp list accounts/environment-instance --subaccount <SUB_ID>` |
 | **AI Core** entitlement + instance + a deployed foundation model | only on `--llm-provider aicore` — use it if you have it. No AI Core? Any OpenAI-compatible endpoint works instead (`openai-compatible`); the model can be hosted anywhere, no BTP service needed for it. | `cf marketplace -e aicore` |
 | **HANA Cloud** (`hana / hdi-shared`) | only for the durable HANA task store — the in-memory store is fine for MVPs | `btp --format json list accounts/entitlement --subaccount <SUB_ID> \| jq '.quotas[] \| select(.service=="hana" or .service=="hana-cloud")'` |
-| **Destination** + **XSUAA** entitlements + instances | only when wiring the agent into Joule ([03-joule](../03-joule/)); Destination is also the production-grade way to reach backends (see [optional/connect-data](../optional/connect-data/)) | `cf marketplace -e destination` · `cf marketplace -e xsuaa` |
+| **Destination** + **XSUAA** entitlements + instances | only when wiring the agent into Joule ([03-joule](../03-joule/)); Destination is also the production-grade way to reach backends | `cf marketplace -e destination` · `cf marketplace -e xsuaa` |
 
 Missing a conditional entitlement? BTP Cockpit → *Entitlements* → *Configure Entitlements*. For AI Core, the entitlement alone is not enough — create the instance **and** deploy at least one foundation model, or the agent has no callable model.
 
@@ -114,7 +115,7 @@ Both routes:
 
 ## Step 1 — Deploy with the toolkit
 
-You already built the agent in checkpoint 1 (plus optional/connect-data if you took it) — you do **not** re-scaffold here. The toolkit's `deploy-agent` command takes the existing project directory and drives the whole deployment: build the manifest / Helm chart, create the service bindings (HANA / Destination / XSUAA where used), push the app to the runtime, and (where Joule is available) register the capability. It auto-detects the project type from the files in the directory. You don't hand-write a `manifest.yml`, `xs-security.json`, an APIRule, or a `cf push` — the toolkit generates and runs them.
+You already built the generated agent in checkpoint 1 — you do **not** re-scaffold here. The toolkit's `deploy-agent` command takes the existing project directory and drives the whole deployment: build the manifest / Helm chart, create the service bindings (HANA / Destination / XSUAA where used), push the app to the runtime, and (where Joule is available) register the capability. It auto-detects the project type from the files in the directory. You don't hand-write a `manifest.yml`, `xs-security.json`, an APIRule, or a `cf push` — the toolkit generates and runs them.
 
 ```bash
 # Cloud Foundry (default target)

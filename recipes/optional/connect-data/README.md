@@ -1,79 +1,141 @@
-# Optional · Connect data — swap mock tools for a live backend
+---
+id: connect-data
+title: Connect the agent to sandbox data
+description: Read production-order records through the public SAP sandbox and compare the agent reply with those records.
+prerequisites: []
+est_time: 15 min
+intended_platform: [local]
+category: optional
+status: experimental
+---
 
-> **Guided:** optional step — `/start` offers it after checkpoint 1 (and it works just as well after deploying). Mid-flow prompt: *"Connect my agent to real data: …"*
-> **Flow:** optional **branch** off **[01-scaffold-agent](../../01-scaffold-agent/)** — replaces the scaffold's mock tool data with a live backend. Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)** (`deploy-agent` is idempotent, so re-deploying an already-deployed agent after connecting data works too).
-> **Input:** the agent project from **01-scaffold-agent** (its Output) — talking, with mock data in its tools.
-> **Output:** the same project answering from a live backend (worked example: the S/4HANA `A_SalesOrder` OData service) — real answers to questions like "which sales orders are open for sold-to party X?".
-> **Toolkit command:** none — this step edits the `tools/` directory of the project `create-agent` produced.
+# Connect the agent to sandbox data
 
-Take this when the pilot needs live business data—the S/4HANA sales-order tool
-below is the worked example; the same pattern (prompt the coding agent, keep
-credentials behind the tool boundary, verify with a message that must call the
-tool) applies to SuccessFactors, Ariba, or any HTTP API your agent's purpose
-needs. Skip it entirely if mock data is enough for the demo or the deployment
-milestone comes first.
+> Guided: Ask your coding agent: "Connect the checked-in production-order sample to the public SAP sandbox."
+> Input: The checked-in [production-order agent](../../../samples/production-order-agent/) and a personal sandbox API key.
+> Output: The same agent answers from production-order records returned by the public sandbox.
 
-You do **not** hand-write the tool. Continue the same coding-agent session and
-give it a follow-up prompt. The harness rewrites the mock tool bodies against
-the real backend while keeping the tool interfaces, system prompt, and
-Agent Card unchanged.
+The checked-in sample already contains the data connector.
+You change its runtime configuration, then send a real A2A message.
+A2A is the protocol that carries messages between agents.
+The agent calls two MCP tools for status and scheduled operations.
+MCP is the protocol that connects agents to tools.
+
+This is a standalone path for the checked-in Python sample.
+If checkpoint 1 uses that sample, continue with the same project here.
+Older toolkit-generated projects need their own backend adapter.
+This recipe does not modify those projects or provide their deployment handoff.
+
+This recipe uses `API_PRODUCTION_ORDER_2_SRV` and `A_ProductionOrder_2`.
+The sandbox returns synthetic demonstration records over a real HTTP API.
+These records do not prove access to a customer tenant or live business data.
+The model provider remains `mock`, which produces a deterministic summary.
+You do not need BTP, AI Core, Joule, or a private toolkit for this path.
 
 ## Prerequisites
 
-- The agent project from [`01-scaffold-agent`](../../01-scaffold-agent/) that
-  already serves a valid Agent Card, open in your selected coding harness.
-- A reachable backend. For the worked example: an S/4HANA system exposing the standard **`API_SALES_ORDER_SRV`** OData service (entity set `A_SalesOrder`).
-- Backend credentials available to the agent at runtime — for the worked example: `S4_BASE_URL`, `S4_USERNAME`, `S4_PASSWORD` (basic auth for the demo; use a BTP Destination + principal propagation in production — see [`03-joule`](../../03-joule/)).
-- **No S/4 tenant? Use the free sandbox.** Register at [api.sap.com](https://api.sap.com), then use `S4_BASE_URL=https://sandbox.api.sap.com/s4hanacloud` with the key sent as an `APIKey` header (`S4_APIKEY`) instead of basic auth — mention that in the step-1 prompt and Claude Code wires it. Mock data on SAP's side, but the real OData shape, so the tool ports to a customer tenant unchanged. Note: the sandbox is on the public internet and not reachable from air-gapped sovereign environments (see [`references/PREREQUISITES.md`](../../../references/PREREQUISITES.md)).
+1. Install Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+2. Start from a clean public Cookbook clone.
+3. Obtain your personal API key from [SAP Business Accelerator Hub](https://api.sap.com/api/API_PRODUCTION_ORDER_2_SRV/overview).
 
-## Step 1 — Prompt the coding agent to connect the tool
+Use the terms shown on SAP Business Accelerator Hub for sandbox access.
+The sandbox requires public internet access.
+Air-gapped environments need a separate, approved connection to their own backend.
+Customer authentication, BTP Destinations, and principal propagation are outside this recipe.
 
-In the session that has the project open, describe what you want the agent to be
-able to do. Let the coding harness inspect the project and propose the file
-layout, function signatures, and API mechanics. The worked example:
+## Start the MCP data server
 
-> Replace the mock data in the sales-order-agent with live S/4HANA data — it should answer things like "which orders are open for this customer?" and "what's on order 12345?" from the real system. Our S/4 connection details are in the environment.
-
-That's enough. The coding agent should find the right S/4HANA OData service
-(`API_SALES_ORDER_SRV` / `A_SalesOrder`), pattern-match the existing S/4 tool at
-[`references/supply-chain-risk-agent/tools/s4_purchase_orders.py`](../../../references/supply-chain-risk-agent/tools/s4_purchase_orders.py),
-rewrite the tool bodies, and keep credentials and endpoint URLs behind the tool
-boundary so the model never sees them.
-
-For a different backend, swap the description: *"…answer questions about leave balances from SuccessFactors…"*, *"…check open POs in Ariba…"* — same flow, same boundary rules. If you want to steer it, add specifics ("filter by sold-to party", "include line items", "use a BTP Destination instead of basic auth"). Review the generated files before running.
-
-## Step 2 — Provide backend credentials
-
-Locally (worked example):
+In the first terminal, change to the sample directory from the Cookbook root:
 
 ```bash
-export S4_BASE_URL=https://<s4-host>          # or https://sandbox.api.sap.com/s4hanacloud
-export S4_USERNAME=<user>                      # tenant only
-export S4_PASSWORD=<secret>                    # never commit; use a secret store in deployment
-# sandbox instead: export S4_APIKEY=<key-from-api.sap.com>
-npm start                                      # or the scaffold's run command
+cd samples/production-order-agent
+uv sync --frozen --group dev
 ```
 
-## Verify it works
+Enter your API key without echoing it:
 
 ```bash
-# The Agent Card still resolves (tool wiring didn't break the app):
-curl -s http://localhost:8080/.well-known/agent.json | jq .name
+read -r -s S4_API_KEY
+echo
+export S4_API_KEY
+export DATA_MODE=s4
+export S4_BASE_URL=https://sandbox.api.sap.com/s4hanacloud/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV
+MCP_HOST=127.0.0.1 MCP_PORT=8090 \
+uv run --frozen python -m production_order_agent.mcp_server
 ```
 
-Then send the agent a message that **must call the tool**. In the coding-agent
-session, ask: *"Send the running agent this message and show me the reply:
-'List the open sales orders for sold-to party 0000100000.'"* The harness derives
-the JSON-RPC envelope from the scaffolded code and shows the reply.
+Do not paste the key into chat, a command, source files, or an environment file.
+The MCP server sends the key in the `APIKey` header.
+The agent and model receive tool records, without the key.
+`S4_BASE_URL` includes the full API service path.
+The sample does not use `S4_USERNAME`, `S4_PASSWORD`, or `S4_APIKEY`.
 
-Expected: the agent answers with real `A_SalesOrder` rows, and the tool invocation appears in the app logs. If the reply still reads like the scaffold's mock data, the rewrite didn't land — re-check the step-1 wiring.
+## Start the A2A agent
 
-## Sovereign note
+In a second terminal, change to the same sample directory:
 
-The backend read path is region-agnostic — it is a plain HTTP/OData call to the customer's own system. Only the **model** provider changes per region: this step works identically whether the agent runs on `--llm-provider aicore` or the `openai-compatible` sovereign gateway ([`../sovereign-model-gateway/`](../sovereign-model-gateway/)).
+```bash
+cd samples/production-order-agent
+HOST=127.0.0.1 PORT=8000 URL=http://127.0.0.1:8000 \
+LLM_PROVIDER=mock \
+MCP_SERVER_URL=http://127.0.0.1:8090/sse \
+uv run --frozen python -m production_order_agent
+```
 
-## Next
+Keep both processes local to your workstation.
+The sample provides no authentication on either local endpoint.
 
-Deploy (or re-deploy) in [02-deploy-btp](../../02-deploy-btp/).
+## Make sure that the data path works
 
-> If you didn't pick the durable HANA task store at scaffold time and now want it (state surviving restarts / scale-out), re-run the 01-scaffold-agent prompt with the "durable HANA task store" line — everything here still applies.
+In a third terminal, change to the same sample directory.
+Enter your key again because separate terminals do not share exported variables:
+
+```bash
+cd samples/production-order-agent
+read -r -s S4_API_KEY
+echo
+export S4_API_KEY
+export S4_BASE_URL=https://sandbox.api.sap.com/s4hanacloud/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV
+uv run --frozen python scripts/smoke_data.py --order-id 1000001
+```
+
+The command reads status and operations directly from the backend.
+It then sends `Show the status and operations for order 1000001.` to the agent.
+It compares the completed reply with the summary of those backend records.
+The comparison ignores record order but retains every summary line and duplicate.
+The command prints record counts and the comparison result.
+It prints no API key, endpoint URL, or raw business records.
+
+Choose a numeric order from the sandbox API explorer that returns both datasets.
+Replace the example `1000001` if that order is absent in your sandbox.
+The command rejects the built-in mock order `1000000`.
+An absent order, unusable records, a failed task, or a different reply fails the command.
+If the sandbox records change between reads, repeat the command.
+
+The Agent Card is at `/.well-known/agent-card.json` on port 8000.
+An Agent Card alone does not prove that the data path works.
+The summary identifies an overdue operation only from its returned dates and confirmation state.
+It does not establish the business cause of a delay.
+
+## Troubleshooting
+
+If the command fails, make sure that both processes still run.
+Make sure that the MCP terminal uses `DATA_MODE=s4` and a valid `S4_API_KEY`.
+Make sure that the agent uses `LLM_PROVIDER=mock` and the correct MCP URL.
+Make sure that `S4_BASE_URL` includes the full production-order service path.
+Use an order that exists in your sandbox and returns both datasets.
+Keep API keys and raw responses out of logs that you share.
+
+## Cleanup
+
+Stop both server processes with Ctrl+C in their terminals.
+In the first and third terminals, remove the connection variables:
+
+```bash
+unset S4_API_KEY S4_BASE_URL DATA_MODE
+```
+
+The recipe performs read-only requests and creates no SAP resource.
+The sample keeps A2A task state in memory.
+For the local demonstration, stop the servers after the test.
+Choose a separately validated deployment recipe before exposing the agent outside your workstation.

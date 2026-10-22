@@ -18,12 +18,16 @@ last-validated: 2026-07-06
 
 # HANA Vector Store — RAG over customer documents
 
-> **Flow:** optional retrieval **branch** layered on the agent project from **[optional/connect-data](../connect-data/)** (or the sovereign variant from optional/sovereign-model-gateway). Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
-> **Input:** the data-connected agent project from **optional/connect-data** (its Output), on a HANA-enabled tenant, plus source documents and an in-region embedding endpoint (AI Core `EMB_DEPLOYMENT_ID`, or the OpenAI-compatible gateway from optional/sovereign-model-gateway).
+> Flow: This recipe extends a toolkit-generated agent from [checkpoint 1](../../01-scaffold-agent/).
+> Input: A toolkit-generated project, source documents, HANA access, and an approved embedding endpoint.
 > **Output:** a `DOCS` table with `REAL_VECTOR(N)` loaded chunks, an HNSW index `IDX_DOCS_EMB`, and a `retrieve_context(query, k)` tool wired into the agent — the augmented project is consumed by **02-deploy-btp**.
 > **Toolkit command:** none — this recipe extends the project emitted by `/sap-a2a-agent-toolkit:create-agent` in checkpoint 1.
 
-Use this when the agent needs semantic retrieval over customer documents or structured business context. This recipe layers retrieval onto the finished agent from **[optional/connect-data](../connect-data/)**; work through checkpoint 1 and optional/connect-data first, then come back here.
+This recipe adds retrieval to a toolkit-generated agent.
+The standalone [connect-data](../connect-data/) sample does not provide this integration.
+Its agent calls only the two production-order tools.
+A sample-specific HANA path requires separate implementation and runtime proof.
+Complete the generated project prerequisites before you continue here.
 
 > **Before you start**
 > - Run `recipes/optional/region-preflight/` to confirm HANA Cloud and the embedding model are available in the target region.

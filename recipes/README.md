@@ -1,6 +1,13 @@
 # Recipes
 
-**One recipe per checkpoint — the folder number is the checkpoint number.** These are the playbooks behind the guided flow: in Claude Code, `/start` reads and executes them checkpoint by checkpoint, and you can also run them by hand, in order. The scaffold ships with **mock data**, so the linear track needs no backend system at all — connecting live business data is an opt-in ([`optional/connect-data`](optional/connect-data/)). The worked example throughout is a **Sales Order Agent**; your own agent follows the same shape with a different purpose — the toolkit's `--prompt` spec workflow tailors the scaffold to whatever you tell it.
+Each numbered folder is one checkpoint in the guided toolkit flow.
+The generated agent starts with mock data.
+The toolkit example is a Sales Order Agent.
+Its `--prompt` workflow tailors the generated project to your purpose.
+
+The [connect-data](optional/connect-data/) recipe uses the checked-in Python production-order sample.
+It is a standalone local path to synthetic records from the public SAP sandbox.
+Generated projects need a separate backend adapter.
 
 > ℹ **Not on Claude Code?** Read [`AGENTS.md`](../AGENTS.md), then use the locally built toolkit MCP server (Codex, Cursor, OpenCode, Gemini CLI, Cline) or the raw shell scripts. Run `./scripts/build-toolkit-mcp.sh`; the MCP package is not published. See [`docs/harnesses.md`](../docs/harnesses.md) and the vendored [`SCRIPTS.md`](../toolkits/a2a-agent-toolkit/SCRIPTS.md). Same inputs, same outputs.
 
@@ -24,7 +31,9 @@ From the Cookbook root, clone the toolkit and launch Claude Code with the plugin
 | [**02 · Deploy on BTP**](02-deploy-btp/) | a public agent URL (Cloud Foundry or Kyma) | a BTP subaccount with CF or Kyma — first step that needs one |
 | [**03 · In Joule**](03-joule/) | the agent answering inside Joule | a Joule-enabled tenant (region-dependent) |
 
-Want live business data? Take [`optional/connect-data`](optional/connect-data/) anytime after checkpoint 1 — before or after deploying (`deploy-agent` is idempotent).
+For a standalone sandbox example, use [`optional/connect-data`](optional/connect-data/) with the checked-in Python production-order sample.
+If checkpoint 1 uses that sample, continue with the same project.
+Toolkit-generated projects need a separate backend adapter and deployment path.
 
 ```mermaid
 flowchart TD
@@ -32,8 +41,7 @@ flowchart TD
     C2["02 · deploy on BTP<br/>subaccount + logins + region check<br/>+ deploy-agent (CF or Kyma)"] --> C3
     C3["03 · in Joule<br/>create-destination + joule deploy"]
 
-    C1 -. live business data (anytime) .-> D["optional/connect-data"]
-    D -. rejoins .-> C2
+    SAMPLE["Checked-in Python production-order sample"] --> D["optional/connect-data<br/>standalone local sandbox path"]
     C2 -. sovereign / unfamiliar region .-> P["optional/region-preflight"]
     P -. informs .-> C2
     C2 -. no AI Core in region .-> O1["optional/sovereign-model-gateway"]
@@ -42,25 +50,27 @@ flowchart TD
     O3 -. rejoins .-> C2
     C2 -. GitOps replaces manual push .-> O2["optional/gitops-cicd"]
 
-    D -. RAG .-> W1["optional/hana-vector-store"]
-    D -. KG .-> W2["optional/hana-kg-triple-store"]
+    C1 -. generated project RAG .-> W1["optional/hana-vector-store"]
+    C1 -. generated project KG .-> W2["optional/hana-kg-triple-store"]
     C2 -. observability .-> W3["optional/observe-and-eval"]
     C2 -. SAP Cloud Logging .-> W4["optional/sap-cloud-logging"]
 ```
 
-Each recipe opens with a **Guided** callout naming its checkpoint and a paste-able prompt for entering the flow mid-way, and every Input literally names the producing step's Output — the same project accumulates one capability per step.
+Each recipe names its input, output, and guided prompt.
+The checkpoint project accumulates one capability per step.
+The connect-data recipe is a standalone path for the checked-in sample.
 
 ## Optional — pull in when needed
 
 | Recipe | When | Relationship |
 |---|---|---|
-| [connect-data](optional/connect-data/) | the pilot needs live business data (S/4HANA, SuccessFactors, any HTTP API) instead of the scaffold's mock data | Branch off checkpoint 1, anytime — free api.sap.com sandbox path included. Rejoins at checkpoint 2. |
+| [connect-data](optional/connect-data/) | Read synthetic production-order records from the public SAP sandbox. | Use the checked-in Python sample. Generated agents need a separate adapter. |
 | [region-preflight](optional/region-preflight/) | the target region is sovereign, regulated, or unfamiliar | Diagnostic for checkpoint 2 — Discovery Center check + entitlement dump + LLM-path tier table. Commercial hubs can skip it. |
 | [sovereign-model-gateway](optional/sovereign-model-gateway/) | AI Core is unavailable/blocked (China Landing, NS2, KSA non-regulated, or EU Access without cross-region routing) | Swaps the model provider to `--llm-provider openai-compatible` against a customer-approved gateway. Rejoins at checkpoint 2. |
 | [bring-your-own-model](optional/bring-your-own-model/) | the customer hosts a custom LLM behind AI Core (e.g. Ollama serving Gemma) | Replaces the default catalog model behind `--llm-provider aicore`. Rejoins at checkpoint 2. |
 | [gitops-cicd](optional/gitops-cicd/) | the team wants Argo CD reconciliation instead of a manual `cf push` / `helm upgrade` | Replaces checkpoint 2's manual push with a GitOps pipeline. |
-| [hana-vector-store](optional/hana-vector-store/) | the agent needs RAG over documents | Layers on optional/connect-data — adds a `DOCS` vector table + `retrieve_context(query, k)` tool. |
-| [hana-kg-triple-store](optional/hana-kg-triple-store/) | the agent needs knowledge graph traversal | Layers on optional/connect-data — adds a HANA graph workspace + `graph_query(nl_question)` tool. |
+| [hana-vector-store](optional/hana-vector-store/) | the agent needs RAG over documents | Extends a toolkit-generated project. The standalone production-order sample needs a separate integration. |
+| [hana-kg-triple-store](optional/hana-kg-triple-store/) | the agent needs knowledge graph traversal | Extends a toolkit-generated project. The standalone production-order sample needs a separate integration. |
 | [observe-and-eval](optional/observe-and-eval/) | the deployed agent needs observability and evaluation | Layers on checkpoint 2 — adds structured logging, OTel middleware, and an eval harness. |
 | [sap-cloud-logging](optional/sap-cloud-logging/) | the Kyma-deployed agent needs SAP Cloud Logging integration | Layers on checkpoint 2 (Kyma) — wires telemetry pipelines to SAP Cloud Logging. |
 

@@ -129,6 +129,10 @@ so keep ports `8000` and `8090` local to your workstation.
 
 ## Use the public SAP S/4HANA sandbox
 
+Follow the [connect-data recipe](../../recipes/optional/connect-data/) for the
+local production-order path and a repeatable comparison with backend records.
+The recipe uses the existing connector and keeps the model provider in mock mode.
+
 The workshop's pro-code path used organizer-managed runtime credentials rather
 than asking each participant to obtain them. For this self-contained sample,
 obtain your own free SAP Business Accelerator Hub API key:

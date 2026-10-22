@@ -18,12 +18,16 @@ last-validated: 2026-07-06
 
 # HANA KG / Triple Store — knowledge graph for agents
 
-> **Flow:** optional KG **branch** layered on the agent project from **[optional/connect-data](../connect-data/)**. Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
-> **Input:** the data-connected agent project from **optional/connect-data** (its Output) plus source data and a tenant with the KG / triple-store feature enabled.
+> Flow: This recipe extends a toolkit-generated agent from [checkpoint 1](../../01-scaffold-agent/).
+> Input: A toolkit-generated project, source data and a tenant with the graph feature enabled.
 > **Output:** a HANA graph workspace `COE_PILOT` loaded via batched SPARQL INSERT DATA, plus a `graph_query(nl_question)` tool wired into the agent — the augmented project is consumed by **02-deploy-btp**.
 > **Toolkit command:** none — this recipe extends the project emitted by `/sap-a2a-agent-toolkit:create-agent` in checkpoint 1.
 
-Use this when the customer needs graph-shaped business context: relationship traversal, lineage, ownership, or semantic lookup. This recipe layers a knowledge graph onto the finished agent from **[optional/connect-data](../connect-data/)**; work through checkpoint 1 and optional/connect-data first, then come back here.
+This recipe adds graph queries to a toolkit-generated agent.
+The standalone [connect-data](../connect-data/) sample does not provide this integration.
+Its agent calls only the two production-order tools.
+A sample-specific HANA path requires separate implementation and runtime proof.
+Complete the generated project prerequisites before you continue here.
 
 > **Before you start**
 > - Run `recipes/optional/region-preflight/` to confirm HANA Cloud is available and the KG/triple-store feature is enabled on the target tenant.

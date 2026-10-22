@@ -9,12 +9,21 @@ changes-under-baip: "The scaffolder's `--llm-provider` flag is the port-back bou
 # 01 · Scaffold your agent
 
 > **Guided:** checkpoint 1 — `/start` runs this end-to-end. Mid-flow prompt: *"Set up the toolkit and scaffold my agent — here's what it should do: …"*
-> **Flow:** first checkpoint — no upstream step. Hands off to **[02-deploy-btp](../02-deploy-btp/)**; connect live data anytime via **[optional/connect-data](../optional/connect-data/)**.
+> Flow: This is the first checkpoint. Continue with [02-deploy-btp](../02-deploy-btp/) for the generated project.
+> The standalone [connect-data](../optional/connect-data/) path uses the checked-in Python production-order sample.
 > **Input:** a laptop with Claude Code (or an MCP-capable harness) and **one LLM endpoint** — an SAP AI Core instance with a deployed model, or any OpenAI-compatible endpoint (base URL + key). **No BTP account needed.**
-> **Output:** your agent project (worked example: `sales-order-agent/`) running on `localhost:8080` and replying to real messages **with mock data** — consumed by **02-deploy-btp**, and by **optional/connect-data** when you want a live backend.
+> Output: Your generated agent project replies with mock data on `localhost:8080`.
+> The worked example is `sales-order-agent/`. Checkpoint 2 uses this project.
 > **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent <name> --prompt "…"`.
 
-Install the toolkit driver, scaffold *your* agent, run it locally, and talk to it. The generated tools return **mock data** (TODO-marked bodies tailored to your purpose), so the agent converses and demos end-to-end without touching any backend system. Everything in this checkpoint happens on your laptop — BTP, entitlements, and the region question all wait until [02-deploy-btp](../02-deploy-btp/); live business data is an opt-in via [optional/connect-data](../optional/connect-data/).
+Install the toolkit driver, scaffold your agent, then run the project locally.
+Send a real message to the agent.
+The generated tools return mock data matched to your purpose.
+This checkpoint uses your laptop and does not contact a business backend.
+BTP, entitlements, and region selection belong to [02-deploy-btp](../02-deploy-btp/).
+
+The standalone [connect-data](../optional/connect-data/) path uses the checked-in Python production-order sample.
+Generated projects need a separate backend adapter.
 
 For a credential-free look at the underlying protocol server without an LLM or
 generated business tools, see the experimental
@@ -95,8 +104,9 @@ interface:
 The harness runs the toolkit's `create-agent` flow with the prompt, which
 tailors the system prompt, tools, and AgentCard skills to your purpose (you'll
 get a short spec summary to confirm before it generates). The emitted tools
-carry mock data matched to the purpose—swapping them for a live backend is
-[optional/connect-data](../optional/connect-data/). The worked example used
+carry mock data matched to the purpose. Generated projects need their own
+backend adapters. The standalone [optional/connect-data](../optional/connect-data/)
+recipe uses the checked-in Python production-order sample. The worked example used
 throughout this cookbook is `sales-order-agent`—purpose: *"answer questions
 about S/4HANA sales orders for sales teams"*—but use your own.
 
@@ -180,4 +190,7 @@ and reload behavior are documented in
 
 ## Next
 
-Deploy it — [02-deploy-btp](../02-deploy-btp/). Want live business data first (or after deploying)? [optional/connect-data](../optional/connect-data/) swaps the mock tools for a real backend — S/4HANA via the free api.sap.com sandbox if you don't have a tenant.
+Continue with [02-deploy-btp](../02-deploy-btp/) for the generated project.
+The standalone [optional/connect-data](../optional/connect-data/) path uses the checked-in Python production-order sample.
+It reads synthetic records from the public SAP sandbox.
+It does not replace the generated project's tools or deployment path.
