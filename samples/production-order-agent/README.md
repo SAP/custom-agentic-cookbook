@@ -227,6 +227,23 @@ uv run --frozen --group dev ruff format --check .
 The tests use mock transports and never require or contact SAP S/4HANA or SAP
 AI Core.
 
+The optional AI Core path uses `sap-ai-sdk-gen` 7.4.1 or newer, below version 8.
+SDK 7 replaces the SDK 6 dependency constraints. The locked graph removes
+langchain-community and its aiohttp dependencies. The native OpenAI client
+interface remains unchanged in this sample.
+
+To test the actual SDK client with synthetic HTTP responses, include the
+`aicore` extra:
+
+```bash
+uv run --frozen --group dev --extra aicore pytest
+```
+
+These tests exercise model routing, supplied tool records, and rejection of
+empty completion content. Without the extra, the SDK tests skip.
+Mock transport tests do not establish live AI Core behavior or clear every
+dependency advisory. Assess the full dependency graph before deployment.
+
 ## Boundaries
 
 - Local and container execution only; no Cloud Foundry, Kyma, or Joule assets
