@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
 
-ARG UV_VERSION=0.11.21
-ARG PYTHON_VERSION=3.12
-FROM ghcr.io/astral-sh/uv:${UV_VERSION}-python${PYTHON_VERSION}-trixie-slim
+ARG BASE_IMAGE=ghcr.io/astral-sh/uv:0.13.5-python3.12-trixie-slim@sha256:9b8477a5f2e2f96fa99eaecb7680c1c4c9f527926430f3b630bfb2c3641f8f20
+FROM ${BASE_IMAGE}
 
 RUN groupadd --system --gid 10001 appgroup \
     && useradd --system --gid 10001 --uid 10001 --shell /usr/sbin/nologin \
@@ -21,6 +20,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-dev --all-extras --no-install-project
+
+RUN /usr/local/bin/python -m pip uninstall --yes pip \
+    && /usr/local/bin/python -c 'import ensurepip, pathlib, shutil; shutil.rmtree(pathlib.Path(ensurepip.__file__).parent)'
 
 COPY --chown=10001:10001 src ./src
 

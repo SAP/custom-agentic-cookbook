@@ -1,6 +1,8 @@
 services:
   mcp:
     build: .
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     command: ["python", "-m", "production_order_agent.mcp_server"]
     environment:
       DATA_MODE: ${DATA_MODE:-mock}
@@ -13,6 +15,8 @@ services:
 
   agent:
     build: .
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     depends_on:
       - mcp
     environment:
