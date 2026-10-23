@@ -127,6 +127,17 @@ docker compose down
 The containers run as UID/GID `10001`. Neither service exposes authentication,
 so keep ports `8000` and `8090` local to your workstation.
 
+Compose drops all Linux capabilities and prevents either service from gaining
+new privileges. The image pins the uv 0.13.5 and Python 3.12 base by digest.
+The `BASE_IMAGE` build argument replaces the former `UV_VERSION` and
+`PYTHON_VERSION` arguments. Use a complete image reference for any override.
+An override requires a separate dependency and runtime assessment.
+
+The image uses uv for frozen installation. Its final filesystem excludes
+global pip and the unused ensurepip backup. Original base layers retain those
+files. These controls do not remove all known vulnerabilities or establish
+production readiness. Assess the complete image before deployment.
+
 ## Use the public SAP S/4HANA sandbox
 
 The workshop's pro-code path used organizer-managed runtime credentials rather
@@ -226,6 +237,23 @@ uv run --frozen --group dev ruff format --check .
 
 The tests use mock transports and never require or contact SAP S/4HANA or SAP
 AI Core.
+
+The optional AI Core path uses `sap-ai-sdk-gen` 7.4.1 or newer, below version 8.
+SDK 7 replaces the SDK 6 dependency constraints. The locked graph removes
+langchain-community and its aiohttp dependencies. The native OpenAI client
+interface remains unchanged in this sample.
+
+To test the actual SDK client with synthetic HTTP responses, include the
+`aicore` extra:
+
+```bash
+uv run --frozen --group dev --extra aicore pytest
+```
+
+These tests exercise model routing, supplied tool records, and rejection of
+empty completion content. Without the extra, the SDK tests skip.
+Mock transport tests do not establish live AI Core behavior or clear every
+dependency advisory. Assess the full dependency graph before deployment.
 
 ## Boundaries
 
