@@ -111,4 +111,9 @@ Cross-check the script output (step 1) and the subaccount region (step 3) agains
 | KSA regulated (`sa30`) | `--llm-provider aicore` with `openai-compatible` fallback (entitlement-gated per tenant — the preflight script tells you which). |
 | KSA non-regulated (`sa31`) | `--llm-provider openai-compatible` — AI Core not listed. |
 
-If the region isn't in this table, trust the preflight script (step 1) and the source-backed reference in [`skills/sap-sovereign-regions/references/btp-regional-availability.md`](../../../skills/sap-sovereign-regions/references/btp-regional-availability.md) — if `aicore` shows `available` in Discovery Center **and** the entitlement dump (step 2) has an `aicore` quota **and** the subaccount region (step 3) matches, use `--llm-provider aicore`. Otherwise fall back to `--llm-provider openai-compatible` and wire a customer-approved gateway ([`../sovereign-model-gateway/`](../sovereign-model-gateway/)).
+If the region is absent from this table, use the preflight script from step 1.
+Read the [regional availability reference](../../../skills/sap-sovereign-regions/references/btp-regional-availability.md).
+Use AI Core only when the catalog, entitlement quota, and subaccount region support that choice.
+Otherwise, choose an approved provider path supported by your project.
+The standalone [model gateway recipe](../sovereign-model-gateway/) applies to the checked-in Python production-order sample.
+It does not configure a toolkit-generated project.
