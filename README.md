@@ -46,16 +46,18 @@ git clone https://github.com/SAP/custom-agentic-cookbook.git
 cd custom-agentic-cookbook
 ```
 
-Follow the core path in order:
+Choose the guide that matches your project:
 
 | Checkpoint | Guide | Requirement |
 | --- | --- | --- |
-| 1 | [Scaffold and run an agent locally](recipes/01-scaffold-agent/) | A supported coding agent and an LLM endpoint |
+| 1 | [Run the local agent guide](recipes/01-scaffold-agent/) | Use a project supported by that guide |
 | 2 | [Deploy the mock sample on Kyma](recipes/02-deploy-btp/) | An approved existing Kyma cluster and image registry |
 | 3 | [Connect the agent to Customer-Managed Joule (CMJ)](recipes/03-joule/) | A customer-managed Joule tenant in a supported region |
 
-Checkpoint 1 uses mock data and does not require an SAP BTP account. For the
-complete flow and its dependencies, see the [recipe guide](recipes/README.md).
+The [production-order sample](samples/production-order-agent/) provides the checked-in mock agent used by the current Kyma chart.
+Generated projects need separate deployment packaging.
+Joule requires a separately tested authentication and capability bundle.
+See the [recipe guide](recipes/README.md) for those boundaries.
 
 ### Prepare a local pilot manifest
 
@@ -140,8 +142,9 @@ Fiori are available from [skills.cloud.sap](https://skills.cloud.sap/).
 - [`samples/production-order-agent`](samples/production-order-agent/) is a
   mock-safe A2A v1.0 business example with two MCP tools for production-order
   status and operations, an opt-in public SAP S/4HANA sandbox connection, and
-  optional SAP AI Core synthesis. Local and container paths are included; BTP
-  deployment is intentionally deferred.
+  optional SAP AI Core synthesis. Local and container paths are included.
+  The existing-cluster Kyma recipe deploys its mock path with a private MCP service.
+  Live-data and model-enabled deployment remain separate work.
 
 ## Support
 
