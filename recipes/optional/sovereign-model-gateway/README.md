@@ -1,98 +1,145 @@
-# Optional: Sovereign Model Gateway
+---
+id: sovereign-model-gateway
+title: Use an approved model gateway
+description: Summarize production-order tool records through an approved OpenAI-compatible model endpoint.
+prerequisites: []
+est_time: 15 min
+intended_platform: [local]
+category: optional
+status: experimental
+---
 
-> **Flow:** sovereign-region **branch** — replaces the `aicore` assumption in the checkpoint recipes. Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
-> **Input:** the toolkit driver from **[01-scaffold-agent](../../01-scaffold-agent/)** (its Output) plus a customer-approved OpenAI-compatible gateway URL + API key + model name.
-> **Output:** a `sales-order-agent` CAP + HANA task-store scaffold emitted with `--llm-provider openai-compatible` (no AI Core binding; `langchain-openai` `ChatOpenAI` wired to `MODEL_GATEWAY_URL` with a bearer token) — consumed by **02-deploy-btp** for deploy.
-> **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent sales-order-agent --framework cap --taskstore hana --llm-provider openai-compatible`.
+# Use an approved model gateway
 
-> **Guided:** `/start` routes here automatically at **checkpoint 2** when the preflight shows no AI Core in the target region. Mid-flow prompt: *"Switch my agent to a sovereign model gateway."*
+> Guided: Ask your coding agent: "Run the checked-in production-order sample with my approved model gateway."
+> Input: The [Python production-order sample](../../../samples/production-order-agent/) and an approved gateway, model name, and access key.
+> Output: The local agent summarizes its tool records with the selected model.
 
-Use this when SAP AI Core / GenAI Hub is unavailable or not approved in the target region.
+This recipe uses the checked-in Python sample.
+It does not scaffold a CAP project or change a toolkit-generated agent.
+If checkpoint 1 uses this sample, continue with the same project.
+Generated projects need a separately tested provider and deployment path.
 
-## Region Profiles
+An OpenAI-compatible gateway accepts the chat completion request defined below.
+The agent first calls both production-order MCP tools.
+It then sends their records to the selected model.
+The model receives no S/4 API key or AI Core credentials.
+The default data mode stays `mock` and uses synthetic records.
 
-Default to this recipe for:
+Use this path when your organization approves the selected gateway.
+API compatibility does not prove regional residency, retention, routing, or data-access approval.
+Before an external call, obtain approval to send the selected records to that provider.
+Use [region preflight](../region-preflight/) for current regional service context.
+A region name alone does not select or approve a provider.
 
-- China Landing
-- NS2 / SAP sovereign
-- KSA non-regulated
+## Prerequisites
 
-Use it as fallback anywhere AI Core entitlement or quota is blocked.
+1. Install Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+2. Start from a clean public Cookbook clone.
+3. Obtain the approved gateway base URL, model identifier, and bearer key.
 
-## Scaffold
+The gateway must accept `POST <base-url>/chat/completions`.
+Set the base URL to the API prefix, such as `https://gateway.example.com/v1`.
+Use HTTPS for an external gateway.
+HTTP is accepted only on loopback for a local test.
+Embedded credentials, query parameters, fragments, and redirects are unsupported.
 
-Three interchangeable drivers. All three now accept the sovereign LLM provider natively — the emitted project drops the AI Core service binding, swaps in `@langchain/openai` (TypeScript) / `langchain-openai` (Python), and expects `MODEL_GATEWAY_URL` + `MODEL_GATEWAY_API_KEY` at runtime.
+The request includes `model`, `messages`, `temperature: 0`, and `stream: false`.
+The response must contain a nonempty string at `choices[0].message.content` and the role `assistant`.
+This recipe does not require `/models`, embeddings, streaming, BTP, HANA, or the optional AI Core SDK.
 
-#### Claude Code plugin (default)
+## Start the local tools
 
-```bash
-/sap-a2a-agent-toolkit:create-agent sales-order-agent \
-  --framework cap \
-  --taskstore hana \
-  --llm-provider openai-compatible \
-  --landscape <landscape>
-```
-
-#### MCP server (Codex, Cursor, OpenCode, Gemini CLI, Cline)
-
-Ask the assistant something like:
-
-> Use the sap-a2a-toolkit MCP to scaffold a sovereign TypeScript CAP A2A agent named `sales-order-agent` in landscape `<landscape>`, with the HANA task store and LLM provider `openai-compatible` (this region has no AI Core). Purpose: `<short purpose>`.
-
-Build with `./scripts/build-toolkit-mcp.sh`, then configure the harness to spawn
-the absolute `scripts/start-toolkit-mcp.sh` path. Setup:
-[`docs/harnesses.md`](../../../docs/harnesses.md).
-
-#### Standalone shell script
-
-```bash
-bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/scaffold-ts.sh \
-  --name sales-order-agent \
-  --framework cap \
-  --taskstore hana \
-  --landscape <landscape> \
-  --llm-provider openai-compatible
-```
-
-Reference: `SCRIPTS.md` (in the A2A Agent Toolkit plugin).
-
-The gateway must satisfy the contract in the [Contract](#contract) section below regardless of which driver you use.
-
-## Configure
+In the first terminal, change to the sample directory from the Cookbook root:
 
 ```bash
-export LLM_PROVIDER=openai-compatible
-export MODEL_GATEWAY_URL=https://model-gateway.example.com/v1
-export MODEL_GATEWAY_API_KEY=<secret>
-export MODEL_NAME=<model-name>
+cd samples/production-order-agent
+uv sync --frozen --group dev
+DATA_MODE=mock MCP_HOST=127.0.0.1 MCP_PORT=8090 \
+uv run --frozen python -m production_order_agent.mcp_server
 ```
 
-> ℹ Toolkit ≥ v0.6.0 scaffolds read `MODEL_GATEWAY_URL` / `MODEL_GATEWAY_API_KEY`. Older scaffolds used `OPENAI_BASE_URL` / `OPENAI_API_KEY` — always match the generated `.env.example`.
+Keep the process local to your workstation.
+The local MCP endpoint provides no authentication.
+The tool records stay synthetic for this demonstration.
 
-For deployment, set secrets through the customer's approved deployment mechanism, not in Git.
+## Select the gateway
 
-## Validate
+In the second terminal, change to the sample directory.
+Set your approved URL and model name:
 
-- `curl <MODEL_GATEWAY_URL>/models` if the gateway supports it
-- app start logs show no missing AI Core binding error
-- agent card is reachable
-- simple Joule prompt reaches the agent
+```bash
+cd samples/production-order-agent
+export MODEL_GATEWAY_URL=https://gateway.example.com/v1
+export MODEL_NAME=approved-model-id
+read -r -s MODEL_GATEWAY_API_KEY
+echo
+export MODEL_GATEWAY_API_KEY
+HOST=127.0.0.1 PORT=8000 URL=http://127.0.0.1:8000 \
+LLM_PROVIDER=openai-compatible MCP_SERVER_URL=http://127.0.0.1:8090/sse \
+uv run --frozen python -m production_order_agent
+```
 
-## Contract
+Replace the URL and model example with the approved values.
+The example URL is not a working provider.
+Do not put the key in chat, command arguments, files, or logs that you share.
+The agent sends the key in the gateway `Authorization` header.
+It uses a bounded timeout and keeps TLS certificate validation enabled.
+It does not follow redirects or use proxy environment variables.
 
-The scaffolded agent expects an **OpenAI-compatible** HTTP surface on the customer-approved gateway:
+## Make sure that the provider path works
 
-| Env var | Required | Meaning |
-|---|---|---|
-| `LLM_PROVIDER` | yes | Literal `openai-compatible`. The toolkit branches on this. |
-| `MODEL_GATEWAY_URL` | yes | Base URL of the gateway. Must end in `/v1` for compatibility with `@langchain/openai` / `langchain-openai` defaults. (Pre-v0.6.0 scaffolds: `OPENAI_BASE_URL`.) |
-| `MODEL_GATEWAY_API_KEY` | yes | Bearer token accepted by the gateway. (Pre-v0.6.0 scaffolds: `OPENAI_API_KEY`.) |
-| `MODEL_NAME` | yes | The gateway's deployment/model identifier (not necessarily an upstream OpenAI model name). |
+In a third terminal, send a real A2A message to the agent:
 
-Minimum HTTP surface the gateway must implement (subset of the OpenAI REST spec):
+```bash
+curl -fsS http://127.0.0.1:8000/ \
+  -H 'Content-Type: application/json' \
+  -H 'A2A-Version: 1.0' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "gateway-demo",
+    "method": "SendMessage",
+    "params": {
+      "message": {
+        "messageId": "gateway-demo-message",
+        "role": "ROLE_USER",
+        "parts": [{"text": "Show the status and operations for order 1000000."}]
+      }
+    }
+  }'
+```
 
-- `POST /v1/chat/completions` with the standard `messages`, `model`, `temperature`, `stream` fields.
-- Streaming via SSE (`stream: true`) is recommended but not required.
-- `POST /v1/embeddings` only if the recipe uses `sap-hana-vector` — see optional/hana-vector-store.
+Make sure that the task state is `TASK_STATE_COMPLETED`.
+Read the text in its artifact.
+Make sure that it describes the returned statuses and operations.
+The synthetic order includes Released, Partially Confirmed, and operations 0010 and 0020.
+The answer must not invent a business cause for a delay.
+Model wording can vary, so inspect the business meaning.
 
-The agent framework never talks to AI Core directly under this path; the entire model surface is the gateway. Region-specific gateway options: Alibaba DashScope / Qwen or PAI-EAS DeepSeek in China Landing; customer-approved sovereign endpoints in NS2 and KSA non-regulated.
+An Agent Card or HTTP 200 alone does not prove this result.
+If the provider request fails, the task must report `TASK_STATE_FAILED`.
+The public error text must omit the key, endpoint, and provider response body.
+Local synthetic tests prove the request contract, without proof of an external provider or sovereign residency.
+
+## Troubleshooting
+
+If the task fails, make sure that both local processes still run.
+Make sure that the model identifier belongs to the selected gateway.
+Make sure that the URL includes the API prefix and excludes `chat/completions`.
+Make sure that the key uses the approved bearer authentication method.
+Make sure that the gateway supports nonstreaming chat completions with the required fields.
+Read local diagnostic types without sharing raw provider responses or secrets.
+
+## Cleanup
+
+Stop both server processes with Ctrl+C in their terminals.
+Remove the gateway variables from the second terminal:
+
+```bash
+unset MODEL_GATEWAY_API_KEY MODEL_GATEWAY_URL MODEL_NAME
+```
+
+This recipe creates no BTP or gateway resource.
+The local agent keeps task state in memory.
+The gateway can bill or retain requests according to its approved service terms.
+Choose a separately tested deployment recipe before exposing the agent outside your workstation.

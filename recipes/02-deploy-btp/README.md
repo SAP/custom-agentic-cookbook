@@ -28,8 +28,9 @@ changes-under-baip: "Service-binding shape may change to BAIP-native bindings; C
 
 # 02 · Deploy on BTP — Cloud Foundry or Kyma
 
-> **Guided:** checkpoint 2 — the **first step that needs a BTP account**. `/start` runs the subaccount checks here, derives the landscape from your subaccount, and routes sovereign regions through the model gateway automatically. Mid-flow prompt: *"Deploy my agent to BTP."*
-> **Flow:** happy-path convergence point — accepts the output of **[01-scaffold-agent](../01-scaffold-agent/)** (default, mock data), **[optional/connect-data](../optional/connect-data/)**, **[optional/sovereign-model-gateway](../optional/sovereign-model-gateway/)**, **[optional/bring-your-own-model](../optional/bring-your-own-model/)**, or the **optional/** RAG / KG variants. Hands off to **[03-joule](../03-joule/)** and **[optional/observe-and-eval](../optional/observe-and-eval/)**.
+> **Guided:** checkpoint 2 — the **first step that needs a BTP account**. `/start` runs the subaccount checks here and derives the landscape from your subaccount. Mid-flow prompt: *"Deploy my agent to BTP."*
+> **Flow:** happy-path convergence point — accepts the output of **[01-scaffold-agent](../01-scaffold-agent/)** (default, mock data), **[optional/connect-data](../optional/connect-data/)**, **[optional/bring-your-own-model](../optional/bring-your-own-model/)**, or the **optional/** RAG / KG variants. Hands off to **[03-joule](../03-joule/)** and **[optional/observe-and-eval](../optional/observe-and-eval/)**.
+> The standalone [model gateway](../optional/sovereign-model-gateway/) recipe uses a separate Python sample and does not provide this deployment handoff.
 > **Input:** the agent project from **01-scaffold-agent** (its Output) — any toolkit-scaffolded shape, task store chosen, `--llm-provider` set. Mock data deploys fine; live data via optional/connect-data can come before or after.
 > **Output:** a deployed A2A agent URL — `<agent>.cfapps.<landscape>.hana.ondemand.com` (CF) or `<agent>.<cluster-domain>` (Kyma) — with the Agent Card reachable, consumed by **03-joule** (Joule wiring) and **optional/observe-and-eval** (observability).
 > **Toolkit command:** `/sap-a2a-agent-toolkit:deploy-agent` (drives `cf push` + MTA on CF, or Helm + APIRule v2 on Kyma).
@@ -48,10 +49,12 @@ The landscape is **derived from the subaccount**, not asked: `btp --format json 
 |--------|------------------|
 | Commercial hubs (`eu10`, `eu11`, `us10`, `us20`, `us21`, `ap10`, `ap11`, `jp10`, …) | `--llm-provider aicore` |
 | EU Access (`eu10`/`eu11` operational-restriction tier) | `aicore` — cross-region model routing needs customer approval; fallback `openai-compatible`. |
-| China Landing (`cn40`, `cn41`) · NS2 · KSA non-regulated (`sa31`) | `openai-compatible` — AI Core not in region → [`../optional/sovereign-model-gateway/`](../optional/sovereign-model-gateway/). |
+| China Landing (`cn40`, `cn41`) · NS2 · KSA non-regulated (`sa31`) | Use an approved provider supported by the generated project. The standalone [model gateway](../optional/sovereign-model-gateway/) recipe applies to the Python sample only. |
 | KSA regulated (`sa30`) | `aicore` with `openai-compatible` fallback (entitlement-gated per tenant). |
 
-Sovereign, regulated, or unfamiliar region — or the table above doesn't settle it? Run the full [**region preflight**](../optional/region-preflight/) (Discovery Center check + entitlement dump + tier rules) before continuing. If the provider changes here (e.g. the scaffold used `aicore` but the region has none), re-scaffold with the right `--llm-provider` or follow the sovereign gateway recipe — the tool code and Agent Card carry over unchanged.
+For a sovereign, regulated, or unfamiliar region, run the [region preflight](../optional/region-preflight/) before continuing.
+If your provider changes, use a tested provider path supported by the generated project.
+The standalone [model gateway recipe](../optional/sovereign-model-gateway/) does not modify that project.
 
 ### 0.2 What the subaccount must have
 
@@ -109,7 +112,7 @@ Kyma route:
 Both routes:
 - The agent project from checkpoint 1, serving a valid Agent Card locally. Any toolkit-scaffolded shape works — TS Express, TS CAP, or the Python four-file shape.
 - **Canonical entrypoints** (already encoded in the scaffold's manifest/chart — don't hand-edit): Python: `uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}`; TS Express: `npm start` honouring `$PORT`; CAP: the MTA module's start command.
-- Sovereign LLM contract values ready: `MODEL_GATEWAY_URL`, `MODEL_GATEWAY_API_KEY`, plus the model-name var from the scaffold's `.env.example` (see [`../optional/sovereign-model-gateway/`](../optional/sovereign-model-gateway/)).
+- Approved model-provider values ready: use the variables supported by the generated project's `.env.example`.
 - **Agent Card path (a2a-sdk version-dependent):** SDK pinned to spec ≤ v0.2.6 serves `/.well-known/agent.json`; spec ≥ v0.3.0 serves `/.well-known/agent-card.json`. Check the scaffolded code and use the matching path in the verify commands below.
 
 ## Step 1 — Deploy with the toolkit
@@ -204,7 +207,7 @@ kubectl delete serviceinstance <agent-name>-destination
 
 - **Commercial (eu10/us10/us20/eu20/ap10):** both runtimes available. CF route `<app>.cfapps.<landscape>.hana.ondemand.com`. AI Core not entitled by default in every commercial subaccount — confirm in step 0.2 before passing `--llm-provider aicore`.
 - **China Shanghai (cn40):** CF yes, Kyma yes in the 2026-07-07 Discovery Center check. Deploy CF using the `.sapcloud.cn` route (`<app>.cfapps.cn40.platform.sapcloud.cn`) or deploy through Kyma after tenant entitlement is confirmed. No AI Core / GenAI Hub in cn40 (confirm with the [region preflight](../optional/region-preflight/)) — `--llm-provider openai-compatible` is mandatory, pointed at a BYO-LLM endpoint (Alibaba DashScope / Qwen, or PAI-EAS DeepSeek). Anthropic / OpenAI / Gemini routes are blocked at the network boundary.
-- **NS2 (Sterling + Colorado):** both runtimes available. CF API endpoints are issued per-tenant under the NS2 boundary — pull the literal hostname from the subaccount overview; do not hardcode. AI Core is not listed for NS2 (confirm with the [region preflight](../optional/region-preflight/)), so `--llm-provider openai-compatible` against the sovereign model gateway is the only supported route here; there is no AI Core fallback to bolt on.
+- **NS2 (Sterling + Colorado):** both runtimes are available. Use the literal CF API hostname from your subaccount overview. For current AI Core availability, use the [region preflight](../optional/region-preflight/). Use an approved, tested provider path supported by the generated project.
 - **KSA regulated (Dammam):** CF yes, Kyma yes. **Only** sovereign region where AI Core is listed (`standard` / `extended`); `--llm-provider aicore` is viable if the subaccount has the entitlement and quota.
 - **KSA non-regulated (Dammam):** CF yes, Kyma yes. No AI Core listed — start with `--llm-provider openai-compatible`.
 
@@ -231,6 +234,6 @@ kubectl delete serviceinstance <agent-name>-destination
 ## Source
 
 - Region availability check: [`../optional/region-preflight/`](../optional/region-preflight/) + Discovery Center.
-- Sovereign LLM setup: [`../optional/sovereign-model-gateway/`](../optional/sovereign-model-gateway/).
+- Standalone Python model gateway: [`../optional/sovereign-model-gateway/`](../optional/sovereign-model-gateway/).
 - Reusable Kyma chart: [`references/kyma-deployment/`](../../references/kyma-deployment/).
 - Reproducible GitOps path: [`../optional/gitops-cicd/`](../optional/gitops-cicd/).

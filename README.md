@@ -105,7 +105,7 @@ Use these optional recipes when the core path needs another capability:
 | --- | --- |
 | [Connect business data](recipes/optional/connect-data/) | Add S/4HANA, SuccessFactors, or another HTTP API |
 | [Check regional availability](recipes/optional/region-preflight/) | Validate services in sovereign, regulated, or unfamiliar regions |
-| [Use a sovereign model gateway](recipes/optional/sovereign-model-gateway/) | Use an approved OpenAI-compatible endpoint where SAP AI Core is unavailable |
+| [Use an approved model gateway](recipes/optional/sovereign-model-gateway/) | Summarize the standalone Python sample's records with an approved OpenAI-compatible endpoint |
 | [Bring your own model](recipes/optional/bring-your-own-model/) | Serve a custom model through SAP AI Core |
 | [Add GitOps delivery](recipes/optional/gitops-cicd/) | Deploy to Kyma with Argo CD |
 | [Add HANA vector search](recipes/optional/hana-vector-store/) | Build retrieval-augmented generation over documents |

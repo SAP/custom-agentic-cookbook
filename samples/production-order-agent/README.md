@@ -13,6 +13,7 @@ A2A client -> Production Order Agent -> MCP server -> mock records (default)
                                       |            -> S/4 public sandbox
                                       -> deterministic summary (default)
                                       -> SAP AI Core summary (optional)
+                                      -> OpenAI-compatible gateway summary (optional)
 ```
 
 The sample is mock-safe by default: no BTP account, S/4 tenant, LLM, or
@@ -164,6 +165,15 @@ For containers, export the same variables and run `docker compose up --build`;
 Compose forwards them to the MCP service without storing their values in the
 file. The sandbox contains synthetic demonstration data and is subject to the
 terms shown on SAP Business Accelerator Hub.
+
+## Use an approved model gateway
+
+Follow the [model gateway recipe](../../recipes/optional/sovereign-model-gateway/) for the local Python sample.
+Set `LLM_PROVIDER=openai-compatible`, `MODEL_GATEWAY_URL`, `MODEL_GATEWAY_API_KEY`, and `MODEL_NAME`.
+The agent sends fetched records to the selected gateway through `POST chat/completions`.
+This path uses the existing HTTPX dependency and does not require the optional AI Core SDK.
+The gateway receives the records and model instructions, without backend credentials.
+Obtain approval for that data transfer before calling an external provider.
 
 ## Optionally summarize with SAP AI Core
 

@@ -100,7 +100,9 @@ carry mock data matched to the purpose—swapping them for a live backend is
 throughout this cookbook is `sales-order-agent`—purpose: *"answer questions
 about S/4HANA sales orders for sales teams"*—but use your own.
 
-Pick the provider by what you have: `aicore` if you have an AI Core instance with a deployed model, `openai-compatible` for any other endpoint (also the required path in sovereign regions without AI Core — see [`../optional/sovereign-model-gateway/`](../optional/sovereign-model-gateway/), which you can wire later).
+Choose a provider supported by your generated project.
+The standalone [model gateway recipe](../optional/sovereign-model-gateway/) uses the checked-in Python production-order sample.
+Generated projects need a separately tested provider path.
 
 **Stacks — the toolkit offers exactly three.** If you don't say otherwise, you get the default:
 

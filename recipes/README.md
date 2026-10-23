@@ -36,9 +36,8 @@ flowchart TD
     D -. rejoins .-> C2
     C2 -. sovereign / unfamiliar region .-> P["optional/region-preflight"]
     P -. informs .-> C2
-    C2 -. no AI Core in region .-> O1["optional/sovereign-model-gateway"]
+    C1 -. approved gateway for Python sample .-> O1["optional/sovereign-model-gateway"]
     C1 -. custom model behind AI Core .-> O3["optional/bring-your-own-model"]
-    O1 -. rejoins .-> C2
     O3 -. rejoins .-> C2
     C2 -. GitOps replaces manual push .-> O2["optional/gitops-cicd"]
 
@@ -50,13 +49,16 @@ flowchart TD
 
 Each recipe opens with a **Guided** callout naming its checkpoint and a paste-able prompt for entering the flow mid-way, and every Input literally names the producing step's Output — the same project accumulates one capability per step.
 
+The model gateway recipe uses the standalone Python production-order sample.
+It does not modify or deploy a toolkit-generated project.
+
 ## Optional — pull in when needed
 
 | Recipe | When | Relationship |
 |---|---|---|
 | [connect-data](optional/connect-data/) | the pilot needs live business data (S/4HANA, SuccessFactors, any HTTP API) instead of the scaffold's mock data | Branch off checkpoint 1, anytime — free api.sap.com sandbox path included. Rejoins at checkpoint 2. |
 | [region-preflight](optional/region-preflight/) | the target region is sovereign, regulated, or unfamiliar | Diagnostic for checkpoint 2 — Discovery Center check + entitlement dump + LLM-path tier table. Commercial hubs can skip it. |
-| [sovereign-model-gateway](optional/sovereign-model-gateway/) | AI Core is unavailable/blocked (China Landing, NS2, KSA non-regulated, or EU Access without cross-region routing) | Swaps the model provider to `--llm-provider openai-compatible` against a customer-approved gateway. Rejoins at checkpoint 2. |
+| [sovereign-model-gateway](optional/sovereign-model-gateway/) | An organization approves an OpenAI-compatible gateway | Uses the standalone Python production-order sample. Generated projects need a separate provider and deployment path. |
 | [bring-your-own-model](optional/bring-your-own-model/) | the customer hosts a custom LLM behind AI Core (e.g. Ollama serving Gemma) | Replaces the default catalog model behind `--llm-provider aicore`. Rejoins at checkpoint 2. |
 | [gitops-cicd](optional/gitops-cicd/) | the team wants Argo CD reconciliation instead of a manual `cf push` / `helm upgrade` | Replaces checkpoint 2's manual push with a GitOps pipeline. |
 | [hana-vector-store](optional/hana-vector-store/) | the agent needs RAG over documents | Layers on optional/connect-data — adds a `DOCS` vector table + `retrieve_context(query, k)` tool. |
