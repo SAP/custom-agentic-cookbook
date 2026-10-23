@@ -50,7 +50,7 @@ Choose the guide that matches your project:
 
 | Checkpoint | Guide | Requirement |
 | --- | --- | --- |
-| 1 | [Run the local agent guide](recipes/01-scaffold-agent/) | Use a project supported by that guide |
+| 1 | [Run the local mock sample](samples/production-order-agent/) | Use the checked-in production-order sample |
 | 2 | [Deploy the mock sample on Kyma](recipes/02-deploy-btp/) | An approved existing Kyma cluster and image registry |
 | 3 | [Connect the agent to Customer-Managed Joule (CMJ)](recipes/03-joule/) | A customer-managed Joule tenant in a supported region |
 

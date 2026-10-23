@@ -24,7 +24,9 @@ def helm(command: str, **values: str) -> subprocess.CompletedProcess[str]:
     arguments.extend([str(CHART), "--namespace", "recipe-test"])
     for name, value in {**IMAGE_VALUES, **values}.items():
         arguments.extend(["--set", f"{name}={value}"])
-    return subprocess.run(arguments, capture_output=True, text=True, timeout=30)
+    return subprocess.run(
+        arguments, capture_output=True, text=True, timeout=30, check=False
+    )
 
 
 def render(**values: str) -> list[dict]:
@@ -111,7 +113,8 @@ class ProductionOrderChartTests(unittest.TestCase):
         )
         for probe in ("readinessProbe", "livenessProbe"):
             self.assertEqual(
-                agent[probe]["httpGet"], {"path": "/.well-known/agent-card.json", "port": "http"}
+                agent[probe]["httpGet"],
+                {"path": "/.well-known/agent-card.json", "port": "http"},
             )
         mcp = deployments["mcp"]["spec"]["template"]["spec"]["containers"][0]
         self.assertEqual(mcp["readinessProbe"]["tcpSocket"], {"port": "http"})
@@ -160,11 +163,20 @@ class ProductionOrderChartTests(unittest.TestCase):
             for item in agent["spec"]["template"]["spec"]["containers"][0]["env"]
         }
         self.assertEqual(environment["URL"], "https://agent.example.com")
-        self.assertIn("-mcp.recipe-test.svc.cluster.local:8090/sse", environment["MCP_SERVER_URL"])
+        self.assertIn(
+            "-mcp.recipe-test.svc.cluster.local:8090/sse", environment["MCP_SERVER_URL"]
+        )
 
-    def test_invalid_image_replica_and_exposure_inputs_fail_before_deployment(self) -> None:
+    def test_invalid_image_replica_and_exposure_inputs_fail_before_deployment(
+        self,
+    ) -> None:
         cases = [
             {"image.repository": ""},
+            {"image.repository": "https://registry.example.com/team/image"},
+            {"image.repository": "registry.example.com/team/image:old"},
+            {"image.repository": "registry.example.com/team/../image"},
+            {"image.repository": "registry.example.com/team//image"},
+            {"image.repository": "Registry.example.com/Team/Image"},
             {"image.tag": "latest"},
             {"image.digest": ""},
             {"image.digest": "sha256:bad"},

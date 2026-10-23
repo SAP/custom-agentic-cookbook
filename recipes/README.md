@@ -27,7 +27,7 @@ The optional recipes require separate integration and deployment tests.
 
 | Checkpoint | Result | Prerequisite |
 |---|---|---|
-| [01: Local agent](01-scaffold-agent/) | A local business reply with mock records | The checked-in Python sample |
+| [01: Local agent](../samples/production-order-agent/) | A local business reply with mock records | The checked-in Python sample |
 | [02: Existing Kyma](02-deploy-btp/) | A deployed mock agent that calls its private MCP service | An approved existing cluster and image registry |
 | [03: Joule](03-joule/) | A reply inside Joule after separate integration | A Joule-compatible endpoint, tenant, authentication, and capability bundle |
 
