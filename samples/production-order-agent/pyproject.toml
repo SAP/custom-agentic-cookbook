@@ -14,7 +14,7 @@ dependencies = [
 
 [project.optional-dependencies]
 aicore = [
-    "sap-ai-sdk-gen>=6.9,<7",
+    "sap-ai-sdk-gen>=7.4.1,<8",
 ]
 
 [dependency-groups]
