@@ -167,6 +167,28 @@ class ProductionOrderChartTests(unittest.TestCase):
             "-mcp.recipe-test.svc.cluster.local:8090/sse", environment["MCP_SERVER_URL"]
         )
 
+    def test_valid_registry_and_tag_boundaries_render_both_images(self) -> None:
+        repositories = [
+            "localhost/team/image",
+            "localhost:5000/team/image",
+            "registry:5000/team/image",
+            "registry.example.com:65535/team_name/image__name--suffix.v2",
+            "registry.example.com:0001/team/image",
+            "registry--name.example.com/team/image",
+            "team_name/image",
+            "image_name.v2",
+        ]
+        tag = "a" * 128
+        for repository in repositories:
+            with self.subTest(repository=repository):
+                documents = render(**{"image.repository": repository, "image.tag": tag})
+                images = [
+                    item["spec"]["template"]["spec"]["containers"][0]["image"]
+                    for item in documents
+                    if item["kind"] == "Deployment"
+                ]
+                self.assertEqual(images, [f"{repository}:{tag}@{DIGEST}"] * 2)
+
     def test_invalid_image_replica_and_exposure_inputs_fail_before_deployment(
         self,
     ) -> None:
@@ -177,7 +199,19 @@ class ProductionOrderChartTests(unittest.TestCase):
             {"image.repository": "registry.example.com/team/../image"},
             {"image.repository": "registry.example.com/team//image"},
             {"image.repository": "Registry.example.com/Team/Image"},
+            {"image.repository": "registry_example.com/team/image"},
+            {"image.repository": "registry..example.com/team/image"},
+            {"image.repository": "-registry.example.com/team/image"},
+            {"image.repository": "registry-.example.com/team/image"},
+            {"image.repository": "registry.example.com:/team/image"},
+            {"image.repository": "registry.example.com:0/team/image"},
+            {"image.repository": "registry.example.com:65536/team/image"},
+            {"image.repository": "registry.example.com:99999/team/image"},
+            {"image.repository": "registry.example.com:-1/team/image"},
+            {"image.repository": "registry.example.com:5000:6000/team/image"},
+            {"image.repository": "a" * 64 + ".example.com/team/image"},
             {"image.tag": "latest"},
+            {"image.tag": "a" * 129},
             {"image.digest": ""},
             {"image.digest": "sha256:bad"},
             {"replicaCount": "2"},
