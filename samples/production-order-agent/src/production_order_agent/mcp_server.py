@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import os
 from typing import Any
@@ -143,20 +144,22 @@ def create_mcp_server() -> FastMCP:
     )
 
     @server.tool()
-    def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:
+    async def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:
         """Return active status records for an SAP S/4HANA production order."""
 
-        return _fetch(
+        return await asyncio.to_thread(
+            _fetch,
             manufacturing_order,
             "status",
             "to_ProductionOrderStatus",
         )
 
     @server.tool()
-    def get_production_order_operations(manufacturing_order: str) -> list[dict[str, Any]]:
+    async def get_production_order_operations(manufacturing_order: str) -> list[dict[str, Any]]:
         """Return scheduled operations for an SAP S/4HANA production order."""
 
-        return _fetch(
+        return await asyncio.to_thread(
+            _fetch,
             manufacturing_order,
             "operations",
             "to_ProductionOrderOperation",
