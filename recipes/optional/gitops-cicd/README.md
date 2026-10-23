@@ -19,10 +19,14 @@ changes-under-baip: "The GitOps, image-tag, namespace, and service-boundary patt
 
 # Optional: Reproducible Kyma GitOps CI/CD
 
-> **Flow:** GitOps **replacement** for **[02-deploy-btp](../../02-deploy-btp/)**'s manual `cf push` / `helm upgrade` — same input project, reconciled by Argo CD instead of pushed by hand. Downstream [03-joule](../../03-joule/) and wip/observe-and-eval still apply against the Argo-managed URL.
-> **Input:** the agent repo from **[01-scaffold-agent](../../01-scaffold-agent/)** (or a branch: optional/connect-data / optional/sovereign-model-gateway / wip/hana-vector-store / wip/hana-kg-triple-store / optional/bring-your-own-model) — the same Output that 02-deploy-btp would consume — plus a Kyma cluster with API Gateway + Istio + BTP Operator.
-> **Output:** a platform repo (`clusters/<cluster-id>/`) with Sealed Secrets, ARC, Argo CD, AppProjects, and BTP Operator bindings; an app repo with Helm/Kustomize deploy state, `.github/workflows/ci.yml` + `deploy.yml`, and an Argo CD `Application` per environment — reconciled agent URL feeds **03-joule and wip/observe-and-eval**.
-> **Toolkit command:** none — this recipe wraps the artifact emitted by `/sap-a2a-agent-toolkit:create-agent` (upstream) and substitutes for `/sap-a2a-agent-toolkit:deploy-agent` from 02-deploy-btp.
+> Flow: This guide describes a separate Argo CD delivery integration.
+> Input: A tested application image and chart, plus the platform-owned GitOps prerequisites below.
+> Output: Reviewed deployment state that Argo CD reconciles for the selected application.
+
+The [existing-cluster recipe](../../02-deploy-btp/) deploys the mock Python sample directly with Helm.
+This GitOps guide does not integrate that chart automatically.
+Generated projects need their own packaging and pipeline tests.
+Joule and observability need separate compatibility and instrumentation tests.
 
 Use this recipe when a regional team needs a reproducible Kyma deployment path
 for an A2A agent repository: pull request checks, container smoke, immutable
@@ -50,9 +54,8 @@ Use this recipe when:
 - a platform team owns shared prerequisites such as namespaces, registry access,
   Argo CD project policy, and secret backends
 
-Use `recipes/02-deploy-btp/` first if the team only needs a manual
-Cloud Foundry or Kyma deployment. Use this recipe once the deployment should be
-repeatable through CI/CD.
+Use [recipe 02](../../02-deploy-btp/) for the direct mock-sample deployment to an existing Kyma cluster.
+Use this separate guide after its application packaging and delivery integration pass.
 
 ## Prerequisites
 

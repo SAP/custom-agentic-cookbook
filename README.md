@@ -51,7 +51,7 @@ Follow the core path in order:
 | Checkpoint | Guide | Requirement |
 | --- | --- | --- |
 | 1 | [Scaffold and run an agent locally](recipes/01-scaffold-agent/) | A supported coding agent and an LLM endpoint |
-| 2 | [Deploy the agent on SAP BTP](recipes/02-deploy-btp/) | A subaccount with Cloud Foundry or Kyma |
+| 2 | [Deploy the mock sample on Kyma](recipes/02-deploy-btp/) | An approved existing Kyma cluster and image registry |
 | 3 | [Connect the agent to Customer-Managed Joule (CMJ)](recipes/03-joule/) | A customer-managed Joule tenant in a supported region |
 
 Checkpoint 1 uses mock data and does not require an SAP BTP account. For the

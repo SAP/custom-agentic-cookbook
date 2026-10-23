@@ -9,9 +9,12 @@ changes-under-baip: "The scaffolder's `--llm-provider` flag is the port-back bou
 # 01 · Scaffold your agent
 
 > **Guided:** checkpoint 1 — `/start` runs this end-to-end. Mid-flow prompt: *"Set up the toolkit and scaffold my agent — here's what it should do: …"*
-> **Flow:** first checkpoint — no upstream step. Hands off to **[02-deploy-btp](../02-deploy-btp/)**; connect live data anytime via **[optional/connect-data](../optional/connect-data/)**.
+> Flow: This guide describes a generated project. The [Kyma recipe](../02-deploy-btp/) uses the checked-in Python sample.
+> Generated projects need separate deployment packaging.
 > **Input:** a laptop with Claude Code (or an MCP-capable harness) and **one LLM endpoint** — an SAP AI Core instance with a deployed model, or any OpenAI-compatible endpoint (base URL + key). **No BTP account needed.**
-> **Output:** your agent project (worked example: `sales-order-agent/`) running on `localhost:8080` and replying to real messages **with mock data** — consumed by **02-deploy-btp**, and by **optional/connect-data** when you want a live backend.
+> Output: Your generated project replies with mock data on `localhost:8080`.
+> The current [Kyma recipe](../02-deploy-btp/) deploys the checked-in Python production-order sample.
+> Generated projects need separately tested deployment packaging.
 > **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent <name> --prompt "…"`.
 
 Install the toolkit driver, scaffold *your* agent, run it locally, and talk to it. The generated tools return **mock data** (TODO-marked bodies tailored to your purpose), so the agent converses and demos end-to-end without touching any backend system. Everything in this checkpoint happens on your laptop — BTP, entitlements, and the region question all wait until [02-deploy-btp](../02-deploy-btp/); live business data is an opt-in via [optional/connect-data](../optional/connect-data/).
@@ -31,7 +34,8 @@ supporting reference material and does not replace this checkpoint.
 
 **Windows:** use WSL2 with Ubuntu and install Claude Code plus the selected scaffold runtime inside WSL. Follow [Windows + WSL2 setup](../../docs/windows-wsl2.md) before continuing; do not run the cookbook from native PowerShell, Command Prompt, or Git Bash.
 
-**Not needed yet:** `cf` / `btp` CLIs, Joule Studio CLI, `mbt` — those enter at [02-deploy-btp](../02-deploy-btp/). No S/4HANA or other backend either — the scaffold ships mock data.
+The local mock path needs no `cf`, `btp`, Joule Studio CLI, or `mbt`.
+The existing-cluster [Kyma recipe](../02-deploy-btp/) uses kubectl and Helm.
 
 One command checks all of this and prints the fix for anything missing: `bash scripts/doctor/doctor.sh` (from the Cookbook root).
 
@@ -110,7 +114,7 @@ Pick the provider by what you have: `aicore` if you have an AI Core instance wit
 | **TypeScript + CAP** | CAP/MTA project shape — required for the durable HANA task store, natural for CAP shops. |
 | **Python** (`--lang python`) | The four-file a2a-sdk/uvicorn shape — pick it when your team extends agents in Python. (The toolkit's interview labels this "Python + Express"; there's no Express involved.) |
 
-**Heading to production?** Add one line to the prompt — *"use a durable HANA task store so multi-turn conversations survive restarts"* — and Claude scaffolds the CAP + MTA variant (`--framework cap --taskstore hana`) instead of in-memory Express. Everything downstream works the same; the HANA entitlement is verified at [02-deploy-btp](../02-deploy-btp/).
+**Heading to production?** Add one line to the prompt — *"use a durable HANA task store so multi-turn conversations survive restarts"* — and Claude scaffolds the CAP + MTA variant (`--framework cap --taskstore hana`) instead of in-memory Express. A HANA-enabled generated project needs separate deployment packaging. The current [Kyma recipe](../02-deploy-btp/) supports the mock Python sample only.
 
 <details>
 <summary>Other drivers — equivalent invocations</summary>
@@ -180,4 +184,6 @@ and reload behavior are documented in
 
 ## Next
 
-Deploy it — [02-deploy-btp](../02-deploy-btp/). Want live business data first (or after deploying)? [optional/connect-data](../optional/connect-data/) swaps the mock tools for a real backend — S/4HANA via the free api.sap.com sandbox if you don't have a tenant.
+Use [02-deploy-btp](../02-deploy-btp/) for the checked-in Python production-order sample on an existing Kyma cluster.
+Generated projects need separate deployment packaging.
+The current chart keeps data and model providers in mock mode.

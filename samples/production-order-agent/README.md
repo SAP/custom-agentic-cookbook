@@ -235,3 +235,12 @@ AI Core.
 - Read-only production-order tools
 - No RAG, SAP-RPT-1, UI, or observability stack
 - A date-based delay signal, not a production scheduling decision
+
+## Deploy the mock sample to Kyma
+
+Follow the [existing-cluster recipe](../../recipes/02-deploy-btp/) for the checked-in mock sample.
+The [production-order chart](../../charts/production-order-agent/) runs the agent and its private MCP service with the same image digest.
+The chart keeps one agent replica and prevents overlapping replicas during upgrades.
+Its default services stay inside the cluster and provide no application authentication.
+Approve image publication, deployment, optional public exposure, and cleanup separately.
+This path does not deploy toolkit-generated projects or configure live data, model providers, HANA, or Joule.

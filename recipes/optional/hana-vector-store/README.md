@@ -18,12 +18,18 @@ last-validated: 2026-07-06
 
 # HANA Vector Store — RAG over customer documents
 
-> **Flow:** optional retrieval **branch** layered on the agent project from **[optional/connect-data](../connect-data/)** (or the sovereign variant from optional/sovereign-model-gateway). Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
-> **Input:** the data-connected agent project from **optional/connect-data** (its Output), on a HANA-enabled tenant, plus source documents and an in-region embedding endpoint (AI Core `EMB_DEPLOYMENT_ID`, or the OpenAI-compatible gateway from optional/sovereign-model-gateway).
-> **Output:** a `DOCS` table with `REAL_VECTOR(N)` loaded chunks, an HNSW index `IDX_DOCS_EMB`, and a `retrieve_context(query, k)` tool wired into the agent — the augmented project is consumed by **02-deploy-btp**.
-> **Toolkit command:** none — this recipe extends the project emitted by `/sap-a2a-agent-toolkit:create-agent` in checkpoint 1.
+> Flow: This is a separate HANA retrieval extension with its own application and deployment contract.
+> Input: An agent with a tested retrieval extension interface, a HANA-enabled tenant, source documents, and an approved embedding endpoint.
+> Output: A `DOCS` vector table, an HNSW index, and a `retrieve_context(query, k)` tool. The augmented project needs separately tested deployment packaging.
+> Toolkit command: None. This extension needs a compatible application interface.
 
-Use this when the agent needs semantic retrieval over customer documents or structured business context. This recipe layers retrieval onto the finished agent from **[optional/connect-data](../connect-data/)**; work through checkpoint 1 and optional/connect-data first, then come back here.
+The [Kyma sample recipe](../../02-deploy-btp/) fixes data and model providers to `mock`.
+It does not package this HANA extension or its bindings.
+The local data recipe alone does not provide this deployment handoff.
+
+Use this guide for document retrieval with a compatible agent tool interface.
+HANA access, an approved embedding path, and application integration require separate tests.
+An S/4 connection is not a prerequisite for this HANA extension.
 
 > **Before you start**
 > - Run `recipes/optional/region-preflight/` to confirm HANA Cloud and the embedding model are available in the target region.

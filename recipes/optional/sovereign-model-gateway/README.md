@@ -1,11 +1,11 @@
 # Optional: Sovereign Model Gateway
 
-> **Flow:** sovereign-region **branch** — replaces the `aicore` assumption in the checkpoint recipes. Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
+> Flow: This guide describes a separate model-provider path. The [Kyma sample recipe](../../02-deploy-btp/) supports mock summaries only.
 > **Input:** the toolkit driver from **[01-scaffold-agent](../../01-scaffold-agent/)** (its Output) plus a customer-approved OpenAI-compatible gateway URL + API key + model name.
-> **Output:** a `sales-order-agent` CAP + HANA task-store scaffold emitted with `--llm-provider openai-compatible` (no AI Core binding; `langchain-openai` `ChatOpenAI` wired to `MODEL_GATEWAY_URL` with a bearer token) — consumed by **02-deploy-btp** for deploy.
+> Output: A generated project with an approved model-provider configuration. It needs separately tested deployment packaging.
 > **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent sales-order-agent --framework cap --taskstore hana --llm-provider openai-compatible`.
 
-> **Guided:** `/start` routes here automatically at **checkpoint 2** when the preflight shows no AI Core in the target region. Mid-flow prompt: *"Switch my agent to a sovereign model gateway."*
+> Guided: Ask your coding agent: "Assess an approved model gateway for my project."
 
 Use this when SAP AI Core / GenAI Hub is unavailable or not approved in the target region.
 

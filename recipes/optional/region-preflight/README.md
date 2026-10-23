@@ -1,12 +1,14 @@
 # Optional · Region Preflight
 
-> **Flow:** diagnostic — run before **[02-deploy-btp](../../02-deploy-btp/)** whenever the target region is sovereign, regulated, or unfamiliar. Not needed for the local checkpoint (1).
-> **Guided:** `/start` runs this automatically at **checkpoint 2** when the region calls for it, deriving the landscape from the subaccount. Mid-flow prompt: *"Run the region preflight for my subaccount and pick the LLM path."*
+> Flow: Use this diagnostic before regional BTP service or model choices. The mock deployment uses an already selected Kyma cluster.
+> Guided: Ask your coding agent: "Run the region preflight for my subaccount and assess the model path."
 > **Input:** a target BTP region and a customer subaccount ID.
-> **Output:** the `--llm-provider` decision (`aicore` | `openai-compatible`) and runtime hint (CF | Kyma), consumed by **02-deploy-btp** (and by a re-scaffold if the provider changes).
+> Output: Regional service context for an explicit model-provider and runtime choice. The existing-cluster mock recipe does not configure these services.
 > **Toolkit command:** none — this recipe runs the preflight script.
 
-**Fast path (commercial regions):** if the subaccount sits in a regular commercial hub (`eu10`, `eu11`, `us10`, `us20`, `ap10`, …), the answer is `--llm-provider aicore` — you can skip this recipe and let [02-deploy-btp](../../02-deploy-btp/)'s step 0 confirm. Run the full preflight below for sovereign/regulated targets (China Landing, NS2, KSA, EU Access) or whenever you're unsure.
+Use this preflight for regional service choices, including model providers.
+The [existing-cluster mock recipe](../../02-deploy-btp/) does not select or bind a model provider.
+An existing cluster alone does not establish model or Joule service availability.
 
 Use this before every customer pilot in a sovereign or unfamiliar region.
 
@@ -66,7 +68,9 @@ Requires `curl` and `jq`. No login needed — the catalog endpoint is public. Wh
 
 Discovery Center says "could this work here?" — your subaccount answers "does it work for me?" Run these against the customer's tenant:
 
-> Not logged in yet? `btp login --url https://cli.btp.cloud.sap` then `btp target --subaccount <SUBACCOUNT_ID>` — the full login walkthrough (including sovereign API URLs) is in [02-deploy-btp step 0.3](../../02-deploy-btp/README.md#03-log-in).
+> If no CLI session exists, use your approved regional BTP login endpoint.
+> Select the intended subaccount before the entitlement query.
+> The existing-cluster mock recipe does not configure a BTP CLI session.
 
 ```bash
 # Full entitlement dump (works without cf login):

@@ -22,10 +22,14 @@ changes-under-baip: "Joule capability YAML schema may evolve; DTA → BAIP capab
 # 03 · Wire into Joule
 
 > **Guided:** checkpoint 3 — the last step, only where Joule is available in the region. Mid-flow prompt: *"Wire my deployed agent into Joule."*
-> **Flow:** terminal step of the happy path — consumes the deployed URL from **[02-deploy-btp](../02-deploy-btp/)**.
-> **Input:** the deployed `<agent>` URL and Agent Card from **02-deploy-btp** (its Output), plus BTP roles `extensibility_developer` + `capabilityadmin` and a working `joule-studio-cli`.
+> Flow: Use a separately tested Joule-compatible endpoint and capability bundle.
+> Input: A Joule-reachable endpoint, compatible protocol, authentication, tenant roles, and a working `joule-studio-cli`.
 > **Output:** a Terraform-managed BTP HTTP destination named `<ALIAS_NAME>` pointing at the deployed URL **plus** a deployed Joule capability bundle (`joule-capability/da.sapdas.yaml`) that surfaces the agent inside Joule.
 > **Automation:** `infra/btp/scripts/joule-destination.sh` creates the native destination; `joule deploy --compile` publishes the capability bundle. The toolkit command remains an alternative for subaccounts not managed by Terraform.
+
+The [Kyma mock recipe](../02-deploy-btp/) provides no Joule integration bundle or application authentication.
+Its default cluster-local endpoint is not a Joule reachability result.
+Test protocol compatibility, endpoint access, and the complete Joule flow separately.
 
 > ⚠ Region: Joule BYOA + A2A v0.3.0 + DTA schema 3.28.0+ is GA in eu10; rolling out elsewhere; NOT GA in cn40 / NS2 / ksa-non-regulated. For sovereign regions, use the UI5 chat shell fallback (recipe TODO).
 > Plugin profile: `genai-hub`
@@ -38,7 +42,7 @@ The customer's region has Joule with DTA schema 3.28.0+ AND the customer wants t
 
 ## Prerequisites
 
-- Agent already deployed ([01-scaffold-agent](../01-scaffold-agent/) — optionally [optional/connect-data](../optional/connect-data/) — then [02-deploy-btp](../02-deploy-btp/))
+- A deployed endpoint with tested Joule protocol, reachability, and authentication compatibility.
 - BTP roles: `extensibility_developer` + `capabilityadmin`
 - Joule Studio CLI: `npm install -g @sap/joule-studio-cli` (note: `@sap/joule-cli` 404s; use `@sap/joule-studio-cli`)
 - `joule login` succeeded (the App2App IAS flow must be configured — see [Troubleshooting](#troubleshooting))
