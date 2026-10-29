@@ -1,7 +1,7 @@
 # Optional · Connect data — swap mock tools for a live backend
 
-> Guided: Ask your coding agent: "Assess a backend adapter for my local agent."
-> Flow: This guide describes a separate local backend-adapter path. The [Kyma deployment](../../02-deploy-btp/) supports mock data only.
+> **Guided:** optional step — `/start` offers it after checkpoint 1 (and it works just as well after deploying). Mid-flow prompt: *"Connect my agent to real data: …"*
+> **Flow:** optional **branch** off **[01-scaffold-agent](../../01-scaffold-agent/)** — replaces the scaffold's mock tool data with a live backend. Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)** (`deploy-agent` is idempotent, so re-deploying an already-deployed agent after connecting data works too).
 > **Input:** the agent project from **01-scaffold-agent** (its Output) — talking, with mock data in its tools.
 > **Output:** the same project answering from a live backend (worked example: the S/4HANA `A_SalesOrder` OData service) — real answers to questions like "which sales orders are open for sold-to party X?".
 > **Toolkit command:** none — this step edits the `tools/` directory of the project `create-agent` produced.
@@ -74,7 +74,6 @@ The backend read path is region-agnostic — it is a plain HTTP/OData call to th
 
 ## Next
 
-Use a separately tested deployment path for the data-connected project.
-The [Kyma sample recipe](../../02-deploy-btp/) does not deploy these backend credentials or adapters.
+Deploy (or re-deploy) in [02-deploy-btp](../../02-deploy-btp/).
 
 > If you didn't pick the durable HANA task store at scaffold time and now want it (state surviving restarts / scale-out), re-run the 01-scaffold-agent prompt with the "durable HANA task store" line — everything here still applies.
