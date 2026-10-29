@@ -141,15 +141,17 @@ The containers run as UID/GID `10001`. Neither service exposes authentication,
 so keep ports `8000` and `8090` local to your workstation.
 
 Compose drops all Linux capabilities and prevents either service from gaining
-new privileges. The image pins the uv 0.13.5 and Python 3.12 base by digest.
-The `BASE_IMAGE` build argument replaces the former `UV_VERSION` and
-`PYTHON_VERSION` arguments. Use a complete image reference for any override.
+new privileges. The image pins Python 3.12 Alpine and uv 0.13.5 by digest.
+The `BASE_IMAGE` and `UV_IMAGE` build arguments accept complete image references.
 An override requires a separate dependency and runtime assessment.
 
-The image uses uv for frozen installation. Its final filesystem excludes
-global pip and the unused ensurepip backup. Original base layers retain those
-files. These controls do not remove all known vulnerabilities or establish
-production readiness. Assess the complete image before deployment.
+The builder uses uv to install frozen dependencies from wheels; uv and its
+build cache stay outside the runtime image. Both Python stages use the same
+base. Alpine uses musl instead of glibc, so additional native dependencies need
+a compatibility check. The runtime removes the unused global pip installer and
+ensurepip backup, and retains its operating-system package inventory for scanning.
+Assess the complete image and Python dependencies before deployment; a base
+change does not establish production readiness.
 
 ## Use the public SAP S/4HANA sandbox
 

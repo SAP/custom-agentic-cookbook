@@ -175,7 +175,30 @@ def run(image: str, mode: str) -> dict:
                 )
                 if state not in ("failed", "TASK_STATE_FAILED"):
                     raise RuntimeError("backend loss did not return a failed A2A task")
+                if mode != "joule":
+                    task = task.get("task", {})
+                artifacts = task.get("artifacts", [])
+                if len(artifacts) != 1 or artifacts[0].get("name") != "error":
+                    raise RuntimeError("backend loss did not return only the error artifact")
+                if "The production-order data could not be retrieved." not in json.dumps(artifacts):
+                    raise RuntimeError("backend loss did not return the safe error message")
                 results["backend_failure"] = True
+                results["safe_error_artifact"] = True
+                docker("start", mcp)
+                deadline = time.monotonic() + 30
+                while True:
+                    try:
+                        restored = business_reply(send(client, base))
+                        if restored != results["reply"]:
+                            raise RuntimeError(
+                                "restored backend returned a different business reply"
+                            )
+                        results["restored_success"] = True
+                        break
+                    except (httpx.HTTPError, RuntimeError):
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError("restored backend did not recover") from None
+                        time.sleep(0.25)
         docker("stop", "--time", "15", agent)
         if mode == "cf" and int(docker("inspect", "--format", "{{.State.ExitCode}}", agent)):
             raise RuntimeError("CF launcher did not stop gracefully")
