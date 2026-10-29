@@ -3,6 +3,8 @@
 This experimental chart deploys the checked-in Python agent and its MCP tools to an existing Kyma cluster.
 Both processes use one image pinned by digest.
 Both use mock data and mock summaries without credentials.
+Build `Dockerfile.mock` for this chart. It installs only the frozen core dependencies.
+The existing model image remains a separate path.
 The agent keeps task state in memory and supports one replica.
 
 Follow [recipe 02](../../recipes/02-deploy-btp/) for image preparation, deployment, a real A2A message, and cleanup.

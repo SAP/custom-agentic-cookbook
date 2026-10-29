@@ -42,7 +42,7 @@ From its root, install and test the sample:
 cd samples/production-order-agent
 uv sync --frozen --group dev
 uv run --frozen pytest -q
-docker build --tag production-order-agent:kyma-smoke .
+docker build --platform linux/amd64 --file Dockerfile.mock --tag production-order-agent:kyma-smoke .
 ```
 
 Use the sample's [Compose flow](../../samples/production-order-agent/) to start both processes locally.
@@ -55,6 +55,28 @@ uv run --frozen python scripts/smoke_a2a.py --base-url http://127.0.0.1:8000
 Require `TASK_STATE_COMPLETED`, Released, Partially Confirmed, operations 0010 and 0020, and a potential delay for operation 0020.
 An Agent Card alone does not prove this result.
 Stop the local Compose processes after the test.
+
+## Repeat the container acceptance test
+
+From the sample directory, obtain the immutable local image ID:
+
+```bash
+docker image inspect production-order-agent:kyma-smoke --format '{{.Id}}'
+```
+
+Set `TEST_IMAGE_ID` to that output. Test the exact image:
+
+```bash
+uv run --frozen python scripts/verify_container.py --image "$TEST_IMAGE_ID"
+```
+
+The test starts the agent and MCP in separate containers.
+Only the agent receives a loopback port.
+The test requires the business reply and a failed task after MCP stops.
+It also requires UID 10001, zero capabilities, and the default seccomp filter.
+The test removes its exact containers and network, then requires the port to close.
+It does not remove the image or change a cluster.
+Use a separate image that matches the node architecture for other targets.
 
 ## Select and approve the target
 
