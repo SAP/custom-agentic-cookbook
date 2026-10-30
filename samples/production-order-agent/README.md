@@ -123,8 +123,9 @@ overdue, unconfirmed operation `0020`.
 
 ## Run in containers
 
-The same image runs either process; Compose supplies the process command and
-the internal MCP URL:
+Compose builds both processes with `Dockerfile.mock`, which installs only the
+frozen core dependencies. The agent uses the mock summary provider. Compose
+supplies the process commands and internal MCP URL:
 
 ```bash
 docker compose up --build
@@ -237,10 +238,33 @@ broader bootstrap and verification workflow. Run the
 [`region-preflight`](../../recipes/optional/region-preflight/) before selecting
 AI Core in a sovereign or unfamiliar region.
 
-For Compose, `~/.aicore/config.json` is not mounted into the container. Export
-`AICORE_AUTH_URL`, `AICORE_CLIENT_ID`, `AICORE_CLIENT_SECRET`,
-`AICORE_BASE_URL`, and `AICORE_RESOURCE_GROUP` in the shell instead; Compose
-passes them through. Ensure `AICORE_BASE_URL` ends in `/v2`.
+Compose does not mount `~/.aicore/config.json` into the container.
+Export `AICORE_AUTH_URL`, `AICORE_CLIENT_ID`, and `AICORE_CLIENT_SECRET` in the shell.
+Export `AICORE_BASE_URL`, `AICORE_RESOURCE_GROUP`, and `MODEL_NAME` in the shell.
+The AI Core override passes these values to the agent.
+Make sure that `AICORE_BASE_URL` ends in `/v2`.
+
+Select the [AI Core override](compose.aicore.yaml) explicitly:
+
+```bash
+docker compose -f compose.yaml -f compose.aicore.yaml up --build
+```
+
+This override builds only the agent with the optional model `Dockerfile` and
+sets its provider to `aicore`. MCP keeps the core `Dockerfile.mock` image and
+mock business records. The default Compose flow does not install the SDK.
+Remove the optional stack with the same files:
+
+```bash
+docker compose -f compose.yaml -f compose.aicore.yaml down
+```
+
+The optional `sap-ai-sdk-gen` and `sap-ai-sdk-core` packages use Apache-2.0.
+The `sap-ai-sdk-base` dependency uses the SAP Developer License Agreement 3.1.
+The Cookbook license does not replace that agreement.
+Before using the optional SDK, read its
+[package license](https://pypi.org/project/sap-ai-sdk-base/3.4.0/). Redistribution of SDK-containing images requires a separate
+license review. The core mock image does not include these SDK packages.
 
 ## Test
 
@@ -272,7 +296,8 @@ dependency advisory. Assess the full dependency graph before deployment.
 
 ## Boundaries
 
-- Local and container execution only; no Cloud Foundry, Kyma, or Joule assets
+- Local, Compose, and experimental existing-cluster Kyma mock execution
+- No Cloud Foundry or Joule deployment assets in this sample
 - In-memory A2A task state
 - No authentication on the A2A or MCP endpoints
 - Read-only production-order tools
