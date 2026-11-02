@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from uuid import uuid4
@@ -65,6 +66,22 @@ class Fixture(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
 
+async def wait_for_mcp(url, deadline):
+    while time.monotonic() < deadline:
+        try:
+            async with asyncio.timeout(min(1, deadline - time.monotonic())):
+                async with sse_client(url) as streams, ClientSession(*streams) as session:
+                    await session.initialize()
+                    names = {tool.name for tool in (await session.list_tools()).tools}
+        except Exception:
+            await asyncio.sleep(0.05)
+            continue
+        if names != {"get_production_order_status", "get_production_order_operations"}:
+            raise RuntimeError("sample MCP tools were not discovered")
+        return
+    raise RuntimeError("sample MCP startup timed out")
+
+
 @contextmanager
 def runtime():
     Fixture.behavior = "normal"
@@ -113,6 +130,9 @@ def runtime():
                 time.sleep(0.05)
             else:
                 raise RuntimeError("sample startup timed out")
+        # This fixture also runs inside async tests; keep its MCP event loop off that thread.
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(asyncio.run, wait_for_mcp(env["MCP_SERVER_URL"], deadline)).result()
         yield env
     finally:
         Fixture.release.set()
@@ -155,6 +175,59 @@ def send_message(env):
         return response.json()["result"]["task"]
 
 
+def test_runtime_waits_for_mcp_when_agent_card_is_already_ready(monkeypatch, tmp_path):
+    gate = tmp_path / "start-mcp"
+    card_ready = threading.Event()
+    runtime_ready = threading.Event()
+    finish = threading.Event()
+    errors = []
+    original_popen = subprocess.Popen
+    original_get = httpx.Client.get
+
+    def delayed_mcp(command, **kwargs):
+        if command[-1] == "production_order_agent.mcp_server":
+            script = (
+                "import pathlib, runpy, time\n"
+                f"gate = pathlib.Path({str(gate)!r})\n"
+                "while not gate.exists():\n"
+                "    time.sleep(0.01)\n"
+                "runpy.run_module('production_order_agent.mcp_server', run_name='__main__')\n"
+            )
+            command = [sys.executable, "-c", script]
+        return original_popen(command, **kwargs)
+
+    def observe_card(client, url, **kwargs):
+        response = original_get(client, url, **kwargs)
+        if url.endswith("/.well-known/agent-card.json") and response.status_code == 200:
+            card_ready.set()
+        return response
+
+    def start_runtime():
+        try:
+            with runtime():
+                runtime_ready.set()
+                finish.wait(15)
+        except Exception as error:
+            errors.append(error)
+
+    monkeypatch.setattr(subprocess, "Popen", delayed_mcp)
+    monkeypatch.setattr(httpx.Client, "get", observe_card)
+    worker = threading.Thread(target=start_runtime)
+    worker.start()
+    try:
+        assert card_ready.wait(10)
+        assert not runtime_ready.wait(0.2), "Agent Card alone must not release the runtime"
+        gate.touch()
+        assert runtime_ready.wait(10)
+        assert not Fixture.paths
+    finally:
+        gate.touch()
+        finish.set()
+        worker.join(20)
+    assert not worker.is_alive()
+    assert not errors
+
+
 def test_fixture_records_reach_completed_a2a_artifact():
     with runtime() as env:
         task = send_message(env)
@@ -184,6 +257,9 @@ def test_timeout_and_backend_failure_produce_failed_a2a_tasks(behavior):
     with runtime() as env:
         Fixture.behavior = behavior
         task = send_message(env)
+        assert any("to_ProductionOrderStatus" in path for path in Fixture.paths)
+        if behavior == "slow":
+            assert Fixture.started.is_set()
         assert task["status"]["state"] == "TASK_STATE_FAILED"
         result = json.dumps(task)
         assert "synthetic-key" not in result
