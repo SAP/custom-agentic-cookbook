@@ -9,10 +9,53 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import httpx
 import pytest
 
+from production_order_agent import mcp_server
 from production_order_agent.mcp_server import S4Repository
 
 ORDER = "7654321"
 NAVIGATION = "to_ProductionOrderStatus"
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["get_production_order_status", "get_production_order_operations"]
+)
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://[private-tenant.example]/service",
+        "https://fixture-user:fixture-secret@private-tenant.example\uff0fservice",
+        "https://private-tenant.example:private-port/service",
+        "https://private-tenant.example/service\x01",
+    ],
+    ids=["ipv6", "nfkc", "port", "control"],
+)
+async def test_malformed_endpoint_errors_are_safe_at_direct_mcp_boundary(
+    tool_name, base_url, monkeypatch, caplog
+):
+    requests = []
+    original_client = httpx.Client
+
+    def unexpected_request(request):
+        requests.append(request)
+        pytest.fail("malformed endpoint reached the HTTP transport")
+
+    def client_with_no_network(**kwargs):
+        kwargs["transport"] = httpx.MockTransport(unexpected_request)
+        return original_client(**kwargs)
+
+    monkeypatch.setattr(httpx, "Client", client_with_no_network)
+    monkeypatch.setenv("DATA_MODE", "s4")
+    monkeypatch.setenv("S4_BASE_URL", base_url)
+    monkeypatch.setenv("S4_API_KEY", "synthetic-parser-key")
+    with pytest.raises(Exception) as error:
+        await mcp_server.create_mcp_server().call_tool(tool_name, {"manufacturing_order": ORDER})
+    diagnostic = "".join(traceback.format_exception(error.value)) + caplog.text
+    assert "S/4 request could not reach the backend" in diagnostic
+    assert not any(
+        value in diagnostic
+        for value in ["private-tenant", "private-port", "fixture-secret", "synthetic-parser-key"]
+    )
+    assert requests == []
 
 
 @pytest.mark.parametrize("failure", ["http", "timeout", "network", "malformed"])

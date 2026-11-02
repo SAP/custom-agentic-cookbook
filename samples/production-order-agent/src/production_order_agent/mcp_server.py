@@ -139,7 +139,7 @@ class S4Repository:
                     body.extend(chunk)
         except httpx.TimeoutException:
             raise RuntimeError("S/4 request timed out") from None
-        except httpx.RequestError:
+        except (httpx.RequestError, httpx.InvalidURL):
             raise RuntimeError("S/4 request could not reach the backend") from None
         try:
             payload = json.loads(body)
