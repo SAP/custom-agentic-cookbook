@@ -257,7 +257,7 @@ def test_timeout_and_backend_failure_produce_failed_a2a_tasks(behavior):
     with runtime() as env:
         Fixture.behavior = behavior
         task = send_message(env)
-        assert any("to_ProductionOrderStatus" in path for path in Fixture.paths)
+        assert any(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
         if behavior == "slow":
             assert Fixture.started.is_set()
         assert task["status"]["state"] == "TASK_STATE_FAILED"
