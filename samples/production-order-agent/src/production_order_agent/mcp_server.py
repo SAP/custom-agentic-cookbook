@@ -178,6 +178,8 @@ def create_mcp_server() -> FastMCP:
         host=os.getenv("MCP_HOST", "127.0.0.1"),
         port=int(os.getenv("MCP_PORT", "8090")),
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     @server.tool()
     async def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:
@@ -208,8 +210,6 @@ mcp = create_mcp_server()
 
 
 def main() -> None:
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
     mcp.run(transport="sse")
 
 
