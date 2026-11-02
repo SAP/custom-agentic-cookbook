@@ -1,0 +1,81 @@
+name: Production order agent
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  mock-agent:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: samples/production-order-agent
+        shell: bash
+    env:
+      DATA_MODE: mock
+      LLM_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies
+        run: uv sync --frozen --group dev
+      - name: Check formatting and imports
+        run: |
+          uv run --frozen --group dev ruff check .
+          uv run --frozen --group dev ruff format --check .
+      - name: Test sample
+        run: uv run --frozen --group dev pytest
+      - name: Check package compatibility
+        run: uv pip check
+      - name: Send a real A2A business message
+        run: |
+          set -euo pipefail
+          mcp_pid=''
+          agent_pid=''
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if [ "$status" -ne 0 ]; then
+              cat "$RUNNER_TEMP/production-order-mcp.log" "$RUNNER_TEMP/production-order-agent.log"
+            fi
+            if [ -n "$agent_pid" ]; then
+              kill "$agent_pid" 2>/dev/null || true
+              wait "$agent_pid" 2>/dev/null || true
+            fi
+            if [ -n "$mcp_pid" ]; then
+              kill "$mcp_pid" 2>/dev/null || true
+              wait "$mcp_pid" 2>/dev/null || true
+            fi
+            exit "$status"
+          }
+          trap cleanup EXIT
+          MCP_HOST=127.0.0.1 MCP_PORT=8090 \
+            .venv/bin/python -m production_order_agent.mcp_server \
+            > "$RUNNER_TEMP/production-order-mcp.log" 2>&1 &
+          mcp_pid=$!
+          HOST=127.0.0.1 PORT=8000 URL=http://127.0.0.1:8000 \
+          MCP_SERVER_URL=http://127.0.0.1:8090/sse \
+            .venv/bin/python -m production_order_agent \
+            > "$RUNNER_TEMP/production-order-agent.log" 2>&1 &
+          agent_pid=$!
+          for attempt in {1..30}; do
+            kill -0 "$mcp_pid"
+            kill -0 "$agent_pid"
+            if curl --fail --silent --max-time 2 \
+              http://127.0.0.1:8000/.well-known/agent-card.json > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          uv run --frozen python scripts/smoke_mcp.py
+          uv run --frozen python scripts/smoke_a2a.py

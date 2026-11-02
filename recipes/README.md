@@ -1,68 +1,71 @@
 # Recipes
 
-The working sample track uses the checked-in Python production-order agent.
-Checkpoint 2 deploys its mock agent and private MCP service to an existing Kyma cluster.
-The sample uses in-memory task state.
-Live deployment and cleanup require their own evidence.
+Start with the [local production-order agent](01-scaffold-agent/). The public
+Python starter answers through A2A and two MCP tools with mock data. It needs
+no BTP account, model endpoint, or credentials.
 
-The older generated-project and optional guides describe separate follow-on paths.
-They do not add HANA, a model provider, instrumentation, GitOps, or Joule compatibility to the mock deployment automatically.
-Read each recipe's input and evidence limits before choosing that path.
+A recipe describes one capability and its prerequisites. A copied README does
+not prove that its complete path works. Read the scope and evidence before
+selecting an optional path.
 
-## Layout
+## Checkpoints
 
-```
-recipes/
-  01-scaffold-agent/  checkpoint 1: local business agent and real message proof
-  02-deploy-btp/      checkpoint 2: mock Python sample on an existing Kyma cluster
-  03-joule/           checkpoint 3: a separate Joule-compatible integration path
-  optional/           pull in only when the situation calls for it (incl. connect-data, RAG, KG, observability)
-```
+| Checkpoint | Output | Current path |
+| --- | --- | --- |
+| [01 · Local agent](01-scaffold-agent/) | A business reply through A2A and MCP | Checked-in public starter with local terminal and container commands. |
+| [02 · BTP deployment](02-deploy-btp/) | A deployed endpoint that answers | The minimal public sample includes a Kyma chart. The broader recipe still needs support assets and live proof. |
+| [03 · Customer-Managed Joule](03-joule/) | A reply inside Joule | Separate tenant-level integration. Current instructions do not support SAP-Managed Joule. |
 
-## The flow
-
-Follow the local sample path, then the existing-cluster deployment recipe.
-Use only public dependencies and the documented smoke command.
-The optional recipes require separate integration and deployment tests.
-
-| Checkpoint | Result | Prerequisite |
-|---|---|---|
-| [01: Local agent](../samples/production-order-agent/) | A local business reply with mock records | The checked-in Python sample |
-| [02: Existing Kyma](02-deploy-btp/) | A deployed mock agent that calls its private MCP service | An approved existing cluster and image registry |
-| [03: Joule](03-joule/) | A reply inside Joule after separate integration | A Joule-compatible endpoint, tenant, authentication, and capability bundle |
+Use the [minimal A2A sample](../samples/fde-a2a-minimal/) for the protocol-only
+path. Use the [production-order sample](../samples/production-order-agent/)
+for the business-agent and MCP path. Neither path requires the internal
+toolkit or a toolkit harness driver.
 
 ```mermaid
 flowchart TD
-    S["Checked-in Python production-order sample"] --> L["Local mock business reply"]
-    L --> K["02: existing-cluster Kyma mock deployment"]
-    S -. separate local data path .-> D["connect-data"]
-    S -. separate local provider path .-> G["model gateway"]
-    X["Compatible endpoint and Joule bundle"] --> J["03: Joule integration"]
+    A["01 public local agent"] --> D["02 deployment"]
+    D --> J["03 Customer-Managed Joule"]
+    A --> L["Optional business data"]
+    A --> M["Optional model provider"]
+    A --> V["Optional HANA retrieval or graph"]
+    D --> G["Optional GitOps"]
+    D --> O["Optional telemetry"]
+    R["Regional preflight"] -. regional decisions .-> D
+    R -. regional decisions .-> M
+    R -. regional availability .-> J
 ```
 
-The chart in checkpoint 2 fixes both providers to `mock`.
-It does not consume generated CAP projects or the augmented projects from the optional guides.
-Data, provider, HANA, logging, and GitOps paths need their own tested packaging.
-A cluster-local URL alone does not meet Joule's endpoint requirements.
+The diagram shows dependencies. It does not claim that all optional paths are
+complete. HANA data paths can use synthetic data without a live S/4 connection.
+Deployment to an existing cluster does not require BTP provisioning automation.
 
-## Optional — pull in when needed
+## Optional recipes
 
-| Recipe | When | Relationship |
-|---|---|---|
-| [connect-data](optional/connect-data/) | A local agent needs backend records | The local data path needs separate deployment configuration. Checkpoint 2 stays mock-only. |
-| [region-preflight](optional/region-preflight/) | A BTP service or model choice depends on regional availability | Provides regional context. Checkpoint 2 uses an existing cluster without model services. |
-| [sovereign-model-gateway](optional/sovereign-model-gateway/) | An organization approves an OpenAI-compatible gateway | The provider path needs separate deployment configuration. Checkpoint 2 stays mock-only. |
-| [bring-your-own-model](optional/bring-your-own-model/) | A team hosts a custom model in AI Core | Requires separate serving, consuming, and deployment evidence. |
-| [gitops-cicd](optional/gitops-cicd/) | A team wants Argo CD delivery | Requires a tested application chart and pipeline integration. The mock chart is not integrated automatically. |
-| [hana-vector-store](optional/hana-vector-store/) | An agent needs document retrieval | Requires HANA integration and separately tested application packaging. |
-| [hana-kg-triple-store](optional/hana-kg-triple-store/) | An agent needs graph queries | Requires HANA integration and separately tested application packaging. |
-| [observe-and-eval](optional/observe-and-eval/) | An agent needs observability and evaluation | Instrumentation and the evaluation harness remain separate work. |
-| [sap-cloud-logging](optional/sap-cloud-logging/) | A workload needs Cloud Logging | Requires application instrumentation, service bindings, and telemetry pipelines beyond the mock chart. |
+| Recipe | Capability | Current limitation |
+| --- | --- | --- |
+| [connect-data](optional/connect-data/) | Connect business records | The recipe describes sales orders. The public production-order sample already provides its own sandbox tools. |
+| [region-preflight](optional/region-preflight/) | Discover regional services | Requery availability before a regional deployment. |
+| [sovereign-model-gateway](optional/sovereign-model-gateway/) | Use an approved model endpoint | The recipe still assumes scaffolder and driver support beyond the public local starter. |
+| [bring-your-own-model](optional/bring-your-own-model/) | Serve a custom model through AI Core | Serving and consuming paths need end-to-end proof. |
+| [hana-vector-store](optional/hana-vector-store/) | Retrieve document context | Existing scoped evidence does not prove the complete public tool integration. |
+| [hana-kg-triple-store](optional/hana-kg-triple-store/) | Query graph relationships | HANA loading, tool integration, and deployment need a complete public path. |
+| [sap-cloud-logging](optional/sap-cloud-logging/) | Export logs, traces, and metrics | The public business agent needs instrumentation and deployment support. |
+| [gitops-cicd](optional/gitops-cicd/) | Deploy through Argo CD | Referenced support assets and a working rollout remain incomplete. |
+| [observe-and-eval](optional/observe-and-eval/) | Evaluate agent behavior | The portable evaluation harness is a placeholder. |
 
-## Adding a recipe
+## Prepare local architecture choices
 
-1. Mirror the frontmatter of [`02-deploy-btp/README.md`](02-deploy-btp/README.md) at the top of the new recipe's `README.md`.
-2. Numbered checkpoint recipes are reserved for the linear track; new material goes to `optional/` (opt-in) with a descriptive slug.
-3. Open with the `> **Guided:** / **Flow:** / **Input:** / **Output:** / **Toolkit command:**` callout — the Guided line names the checkpoint it serves plus a paste-able mid-flow prompt, and the Input must literally name the producing step's Output.
-4. Include `## Verify it works` — with a chat proof (a real message and the expected reply), not just the agent-card curl, wherever the recipe produces a runnable agent.
-5. PR with the CONTRIBUTING checklist.
+The [guided setup skill](../skills/sap-setup-btp-agent/) writes a
+credential-free pilot manifest. The [coordinator](../docs/cookbookctl.md)
+validates and renders that manifest. It does not generate or deploy the
+business starter. The mock recipe does not need a pilot manifest.
+
+## Add or adapt a recipe
+
+Include prerequisites, exact commands, and the expected user-visible result.
+State the tested scope and all required public dependencies. Use the
+[contribution guide](../CONTRIBUTING.md) before submitting a change.
+
+Include troubleshooting and cleanup. If the recipe runs an agent, send a real
+message and inspect the reply. Keep credentials, private URLs, and customer
+information outside public examples and evidence.

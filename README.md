@@ -46,18 +46,17 @@ git clone https://github.com/SAP/custom-agentic-cookbook.git
 cd custom-agentic-cookbook
 ```
 
-Choose the guide that matches your project:
+Follow the core path in order:
 
 | Checkpoint | Guide | Requirement |
 | --- | --- | --- |
-| 1 | [Run the local mock sample](samples/production-order-agent/) | Use the checked-in production-order sample |
-| 2 | [Deploy the mock sample on Kyma](recipes/02-deploy-btp/) | An approved existing Kyma cluster and image registry |
+| 1 | [Run the business agent locally](recipes/01-scaffold-agent/) | Python and uv for the mock business starter |
+| 2 | [Deploy the agent on SAP BTP](recipes/02-deploy-btp/) | A subaccount with Cloud Foundry or Kyma |
 | 3 | [Connect the agent to Customer-Managed Joule (CMJ)](recipes/03-joule/) | A customer-managed Joule tenant in a supported region |
 
-The [production-order sample](samples/production-order-agent/) provides the checked-in mock agent used by the current Kyma chart.
-Generated projects need separate deployment packaging.
-Joule requires a separately tested authentication and capability bundle.
-See the [recipe guide](recipes/README.md) for those boundaries.
+Checkpoint 1 uses the checked-in Python production-order starter with mock
+data. It does not require an SAP BTP account, model endpoint, or credentials. For the
+complete flow and its dependencies, see the [recipe guide](recipes/README.md).
 
 ### Prepare a local pilot manifest
 
@@ -142,9 +141,8 @@ Fiori are available from [skills.cloud.sap](https://skills.cloud.sap/).
 - [`samples/production-order-agent`](samples/production-order-agent/) is a
   mock-safe A2A v1.0 business example with two MCP tools for production-order
   status and operations, an opt-in public SAP S/4HANA sandbox connection, and
-  optional SAP AI Core synthesis. Local and container paths are included.
-  The existing-cluster Kyma recipe deploys its mock path with a private MCP service.
-  Live-data and model-enabled deployment remain separate work.
+  optional SAP AI Core synthesis. Local and container paths are included; BTP
+  deployment is intentionally deferred.
 
 ## Support
 
