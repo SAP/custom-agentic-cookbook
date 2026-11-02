@@ -276,3 +276,28 @@ dependency advisory. Assess the full dependency graph before deployment.
 - Read-only production-order tools
 - No RAG, SAP-RPT-1, UI, or observability stack
 - A date-based delay signal, not a production scheduling decision
+
+## Controlled OData verification
+
+From this sample directory, run the loopback integration tests:
+
+```bash
+uv sync --frozen
+uv run --frozen pytest -q tests/test_runtime_odata.py
+```
+
+The fixture sends distinct records through HTTP, MCP, and a completed A2A artifact.
+The tests require MCP discovery while an HTTP fetch remains blocked.
+They also require failed A2A tasks for backend errors and timeouts.
+Each test stops its processes and closes its ports.
+These tests do not prove access to a real SAP tenant.
+
+The optional S4_REQUEST_TIMEOUT_SECONDS variable sets the HTTP timeout.
+Its default is 20 seconds. Its allowed range is greater than zero and at most 120 seconds.
+
+## S/4 transport limits
+
+The S/4 client rejects response bodies larger than one MiB.
+It requests identity encoding and rejects compressed responses before it reads their bodies.
+It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
+The MCP process omits endpoint addresses from HTTP transport logs.

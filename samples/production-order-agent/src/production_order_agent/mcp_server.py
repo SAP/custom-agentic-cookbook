@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
+import logging
 import os
 from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+MAX_RESPONSE_BYTES = 1048576
 
 DEFAULT_S4_BASE_URL = (
     "https://sandbox.api.sap.com/s4hanacloud/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
@@ -90,6 +94,7 @@ class S4Repository:
         api_key: str,
         *,
         transport: httpx.BaseTransport | None = None,
+        timeout: float = 20,
     ) -> None:
         if not base_url.strip():
             raise RuntimeError("S4_BASE_URL is required when DATA_MODE=s4")
@@ -98,21 +103,51 @@ class S4Repository:
         self.base_url = base_url.rstrip("/") + "/"
         self.api_key = api_key
         self.transport = transport
+        if not 0 < timeout <= 120:
+            raise ValueError("S4_REQUEST_TIMEOUT_SECONDS must be greater than 0 and at most 120")
+        self.timeout = timeout
 
     def fetch(self, manufacturing_order: str, navigation: str) -> list[dict[str, Any]]:
-        with httpx.Client(
-            base_url=self.base_url,
-            headers={"APIKey": self.api_key, "Accept": "application/json"},
-            timeout=20,
-            transport=self.transport,
-        ) as client:
-            response = client.get(order_path(manufacturing_order, navigation))
-
         try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"S/4 request failed with HTTP {response.status_code}") from exc
-        return normalize_odata(response.json())
+            with (
+                httpx.Client(
+                    base_url=self.base_url,
+                    headers={
+                        "APIKey": self.api_key,
+                        "Accept": "application/json",
+                        "Accept-Encoding": "identity",
+                    },
+                    timeout=self.timeout,
+                    transport=self.transport,
+                    trust_env=False,
+                ) as client,
+                client.stream("GET", order_path(manufacturing_order, navigation)) as response,
+            ):
+                if response.status_code >= 300:
+                    raise RuntimeError(
+                        f"S/4 request failed with HTTP {response.status_code}"
+                    ) from None
+                if (
+                    response.headers.get("Content-Encoding", "identity").strip().lower()
+                    != "identity"
+                ):
+                    raise RuntimeError("S/4 response encoding must be identity")
+                body = bytearray()
+                for chunk in response.iter_bytes():
+                    if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                        raise RuntimeError("S/4 response exceeds the one MiB bound")
+                    body.extend(chunk)
+        except httpx.TimeoutException:
+            raise RuntimeError("S/4 request timed out") from None
+        except httpx.RequestError:
+            raise RuntimeError("S/4 request could not reach the backend") from None
+        try:
+            payload = json.loads(body)
+            if not isinstance(payload, dict):
+                raise ValueError("expected an OData envelope")
+        except (ValueError, UnicodeDecodeError):
+            raise RuntimeError("S/4 returned malformed OData") from None
+        return normalize_odata(payload)
 
 
 def _mock_fetch(manufacturing_order: str, field: str) -> list[dict[str, Any]]:
@@ -131,6 +166,7 @@ def _fetch(manufacturing_order: str, field: str, navigation: str) -> list[dict[s
         repository = S4Repository(
             os.getenv("S4_BASE_URL", DEFAULT_S4_BASE_URL),
             os.getenv("S4_API_KEY", ""),
+            timeout=float(os.getenv("S4_REQUEST_TIMEOUT_SECONDS", "20")),
         )
         return repository.fetch(manufacturing_order, navigation)
     raise RuntimeError("DATA_MODE must be 'mock' or 's4'")
@@ -172,6 +208,8 @@ mcp = create_mcp_server()
 
 
 def main() -> None:
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     mcp.run(transport="sse")
 
 
