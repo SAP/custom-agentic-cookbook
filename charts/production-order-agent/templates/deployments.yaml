@@ -1,0 +1,113 @@
+{{- if ne (int .Values.replicaCount) 1 }}
+{{- fail "replicaCount must be 1 because task state is in memory" }}
+{{- end }}
+{{- range $component := list "agent" "mcp" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "production-order-agent.fullname" $ }}-{{ $component }}
+  labels:
+    {{- include "production-order-agent.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "production-order-agent.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $component }}
+  template:
+    metadata:
+      labels:
+        {{- include "production-order-agent.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $component }}
+        sidecar.istio.io/inject: "true"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ $component }}
+          image: {{ include "production-order-agent.image" $ | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command:
+            - python
+            - -m
+            {{- if eq $component "agent" }}
+            - production_order_agent
+            {{- else }}
+            - production_order_agent.mcp_server
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              {{- if eq $component "agent" }}
+              containerPort: 8000
+              {{- else }}
+              containerPort: 8090
+              {{- end }}
+              protocol: TCP
+          env:
+            - name: DATA_MODE
+              value: mock
+            - name: LLM_PROVIDER
+              value: mock
+            {{- if eq $component "agent" }}
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "8000"
+            - name: URL
+              value: {{ include "production-order-agent.url" $ | quote }}
+            - name: MCP_SERVER_URL
+              value: {{ printf "http://%s-mcp.%s.svc.cluster.local:8090/sse" (include "production-order-agent.fullname" $) $.Release.Namespace | quote }}
+            {{- else }}
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: "8090"
+            {{- end }}
+          readinessProbe:
+            {{- if eq $component "agent" }}
+            httpGet:
+              path: /.well-known/agent-card.json
+              port: http
+            {{- else }}
+            tcpSocket:
+              port: http
+            {{- end }}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            {{- if eq $component "agent" }}
+            httpGet:
+              path: /.well-known/agent-card.json
+              port: http
+            {{- else }}
+            tcpSocket:
+              port: http
+            {{- end }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            {{- toYaml (index $.Values.resources $component) | nindent 12 }}
+{{- end }}

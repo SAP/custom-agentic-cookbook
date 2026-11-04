@@ -1,0 +1,6 @@
+apiVersion: v2
+name: production-order-agent
+description: Deploy the experimental mock production-order A2A agent and MCP tools to Kyma.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

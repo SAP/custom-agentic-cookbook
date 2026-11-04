@@ -1,6 +1,8 @@
 services:
   mcp:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     command: ["python", "-m", "production_order_agent.mcp_server"]
@@ -14,7 +16,9 @@ services:
       - "127.0.0.1:8090:8090"
 
   agent:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     depends_on:
@@ -24,12 +28,6 @@ services:
       PORT: 8000
       URL: http://localhost:8000
       MCP_SERVER_URL: http://mcp:8090/sse
-      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
-      MODEL_NAME: ${MODEL_NAME:-}
-      AICORE_AUTH_URL: ${AICORE_AUTH_URL:-}
-      AICORE_CLIENT_ID: ${AICORE_CLIENT_ID:-}
-      AICORE_CLIENT_SECRET: ${AICORE_CLIENT_SECRET:-}
-      AICORE_BASE_URL: ${AICORE_BASE_URL:-}
-      AICORE_RESOURCE_GROUP: ${AICORE_RESOURCE_GROUP:-}
+      LLM_PROVIDER: mock
     ports:
       - "127.0.0.1:8000:8000"

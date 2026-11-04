@@ -1,0 +1,35 @@
+image:
+  # Set all three values. Both processes use the same immutable image content.
+  repository: ""
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# Names of existing image-pull Secrets in the release namespace.
+imagePullSecrets: []
+
+# The agent keeps task state in memory and supports exactly one replica.
+replicaCount: 1
+
+apirule:
+  enabled: false
+  host: ""
+  gateway: kyma-system/kyma-gateway
+  # Explicit development or smoke-test exposure only.
+  noAuth: false
+
+resources:
+  agent:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  mcp:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

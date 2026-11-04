@@ -1,9 +1,12 @@
 # Optional: Bring Your Own Model on SAP AI Core
 
-> **Flow:** model-tier **branch** — replaces the default catalog model behind `--llm-provider aicore`. Requires the `aicore` path confirmed for the region ([02-deploy-btp step 0](../../02-deploy-btp/) or [region-preflight](../region-preflight/)). Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
-> **Input:** the `--llm-provider aicore` decision + AI Core entitlement confirmation (from **[optional/region-preflight](../region-preflight/)** or **02-deploy-btp** step 0), plus a container registry reachable from AI Core and a Git repo connected to AI Core for ServingTemplate manifests.
-> **Output:** a `byom-agent/` CAP + HANA task-store scaffold pointed at a RUNNING AI Core deployment (custom `ollama.yaml` ServingTemplate, `<registry>/<namespace>/ollama:ai-core` image, reachable via `AICORE_BASE_URL/v2/lm/deployments/<deployment-id>`) — consumed by **[02-deploy-btp](../../02-deploy-btp/)** for deploy.
+> Flow: This is a separate AI Core serving and consuming path. Use [region preflight](../region-preflight/) for regional context.
+> Input: An approved AI Core provider, available entitlement, reachable registry, and repository connected to AI Core for ServingTemplate manifests.
+> Output: A custom AI Core deployment and an agent that consumes it. Its generated project needs separate deployment packaging and tests.
 > **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent byom-agent --framework cap --taskstore hana --llm-provider aicore`.
+
+The [Kyma mock recipe](../../02-deploy-btp/) does not deploy this model-enabled generated project.
+Test custom serving, agent consumption, and deployment packaging separately.
 
 Use this when a customer wants to host a custom LLM behind SAP AI Core, for example Ollama serving Gemma, and the target subaccount already has SAP AI Core entitlement and quota.
 

@@ -19,12 +19,15 @@ changes-under-baip: "BAIP is expected to bundle managed traces/evals; a portable
 
 # Observe and evaluate an A2A agent
 
-> **Flow:** observability **branch** layered onto the deployment from **[02-deploy-btp](../../02-deploy-btp/)** — does not replace it.
-> **Input:** the deployed CF app / Kyma workload URL from **02-deploy-btp** (its Output) — this recipe binds observability to the app already running there.
+> Flow: This is separate instrumentation and evaluation work for a compatible deployed application.
+> Input: A deployed application with implemented instrumentation and a tested telemetry integration.
 > **Output:** a bound `<agent-name>-logs` cloud-logging service instance (or a customer-approved log drain in sovereign regions), structured JSON logs with `task_id` / `tool_call` / `llm_call` correlation IDs, and placeholder OTel middleware in `references/middleware/otel.py` (eval harness still TODO).
-> **Toolkit command:** none — this recipe wires observability around the app deployed by `/sap-a2a-agent-toolkit:deploy-agent` in 02-deploy-btp.
+> Toolkit command: None. The middleware and evaluation harness require separate implementation.
 
-Use this when you need to know whether the agent works under real prompts before / after a release. This recipe layers observability onto the deployed agent from **02-deploy-btp**. For the fully validated Kyma + SAP Cloud Logging implementation, see [`optional/sap-cloud-logging/`](../sap-cloud-logging/). Regression tests via a portable offline eval harness are planned (not yet in this repo).
+This guide describes planned instrumentation and evaluation.
+The [Kyma mock recipe](../../02-deploy-btp/) does not supply this middleware or an evaluation harness.
+The [Cloud Logging guide](../sap-cloud-logging/) requires separate instrumentation and service integration.
+Do not treat a deployed mock agent as proof of those capabilities.
 
 > ⚠ Region: Cloud Logging is not in cn40. The recipe routes to customer-approved log targets for sovereign regions.
 
