@@ -51,7 +51,7 @@ Follow the core path in order:
 | Checkpoint | Guide | Requirement |
 | --- | --- | --- |
 | 1 | [Run the business agent locally](recipes/01-scaffold-agent/) | Python and uv for the mock business starter |
-| 2 | [Deploy the agent on SAP BTP](recipes/02-deploy-btp/) | A subaccount with Cloud Foundry or Kyma |
+| 2 | [Deploy the mock agent to Kyma](recipes/02-deploy-btp/) | An existing Kyma cluster and a registry it can read |
 | 3 | [Connect the agent to Customer-Managed Joule (CMJ)](recipes/03-joule/) | A customer-managed Joule tenant in a supported region |
 
 Checkpoint 1 uses the checked-in Python production-order starter with mock

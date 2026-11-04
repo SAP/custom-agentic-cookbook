@@ -18,12 +18,18 @@ last-validated: 2026-07-06
 
 # HANA KG / Triple Store — knowledge graph for agents
 
-> **Flow:** optional KG **branch** layered on the agent project from **[optional/connect-data](../connect-data/)**. Rejoins the happy path at **[02-deploy-btp](../../02-deploy-btp/)**.
-> **Input:** the data-connected agent project from **optional/connect-data** (its Output) plus source data and a tenant with the KG / triple-store feature enabled.
-> **Output:** a HANA graph workspace `COE_PILOT` loaded via batched SPARQL INSERT DATA, plus a `graph_query(nl_question)` tool wired into the agent — the augmented project is consumed by **02-deploy-btp**.
-> **Toolkit command:** none — this recipe extends the project emitted by `/sap-a2a-agent-toolkit:create-agent` in checkpoint 1.
+> Flow: This is a separate HANA graph extension with its own application and deployment contract.
+> Input: An agent with a tested graph-tool extension interface, source data, and a tenant with the graph feature enabled.
+> Output: A HANA graph workspace loaded with source data and a `graph_query(nl_question)` tool. The augmented project needs separately tested deployment packaging.
+> Toolkit command: None. This extension needs a compatible application interface.
 
-Use this when the customer needs graph-shaped business context: relationship traversal, lineage, ownership, or semantic lookup. This recipe layers a knowledge graph onto the finished agent from **[optional/connect-data](../connect-data/)**; work through checkpoint 1 and optional/connect-data first, then come back here.
+The [Kyma sample recipe](../../02-deploy-btp/) fixes data and model providers to `mock`.
+It does not package this HANA extension or its bindings.
+The local data recipe alone does not provide this deployment handoff.
+
+Use this guide for graph queries with a compatible agent tool interface.
+HANA graph access and application integration require separate tests.
+An S/4 connection is not a prerequisite for this HANA extension.
 
 > **Before you start**
 > - Run `recipes/optional/region-preflight/` to confirm HANA Cloud is available and the KG/triple-store feature is enabled on the target tenant.

@@ -13,7 +13,7 @@ selecting an optional path.
 | Checkpoint | Output | Current path |
 | --- | --- | --- |
 | [01 · Local agent](01-scaffold-agent/) | A business reply through A2A and MCP | Checked-in public starter with local terminal and container commands. |
-| [02 · BTP deployment](02-deploy-btp/) | A deployed endpoint that answers | The minimal public sample includes a Kyma chart. The broader recipe still needs support assets and live proof. |
+| [02 · Kyma deployment](02-deploy-btp/) | A deployed mock business reply through A2A and MCP | Checked-in production-order chart for an existing Kyma cluster. This path remains experimental. Model-enabled and other runtime paths require separate configuration and proof. |
 | [03 · Customer-Managed Joule](03-joule/) | A reply inside Joule | Separate tenant-level integration. Current instructions do not support SAP-Managed Joule. |
 
 Use the [minimal A2A sample](../samples/fde-a2a-minimal/) for the protocol-only

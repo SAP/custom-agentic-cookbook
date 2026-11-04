@@ -16,7 +16,7 @@ WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-dev --no-install-project --all-extras --no-build \
+    uv sync --frozen --no-dev --all-extras --no-install-project --no-build \
         --python /usr/local/bin/python --no-managed-python
 
 FROM ${BASE_IMAGE} AS runtime

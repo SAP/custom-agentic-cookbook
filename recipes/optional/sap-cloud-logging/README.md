@@ -20,21 +20,24 @@ changes-under-baip: "BAIP is expected to bundle managed traces/evals. The OTLP-o
 
 # SAP Cloud Logging — observability for an A2A agent on Kyma
 
-> **Flow:** observability **branch** layered onto the Kyma deployment from **[02-deploy-btp](../../02-deploy-btp/)**. Does not rejoin the happy path — it is a terminal capability on top of a running agent.
-> **Input:** the deployed Kyma workload from **02-deploy-btp** (its Output — a Helm-managed A2A server on a Kyma cluster with the Istio sidecar and the Telemetry module available), on a tenant entitled for the `cloud-logging` service.
+> Flow: This is a separate telemetry integration for a compatible Kyma application.
+> Input: An instrumented application, a tested telemetry-enabled chart, Kyma Telemetry, and the required Cloud Logging entitlement.
 > **Output:** a `<release>-cloud-logging` service instance (OTLP ingestion enabled) and binding, three Kyma pipelines (`LogPipeline`, `TracePipeline`, `MetricPipeline`) shipping to SAP Cloud Logging over mTLS, and an instrumented agent emitting trace-correlated JSON logs, `invoke_agent`/`execute_tool` spans nesting auto-instrumented LiteLLM calls, and GenAI + custom application metrics — the whole feature gated behind the `telemetry.enabled` Helm value.
-> **Toolkit command:** none — this recipe wires observability into the Helm chart and app produced in checkpoint 1 and deployed in **02-deploy-btp**.
+> Toolkit command: None. Implement and test the application instrumentation and chart integration separately.
 
-Use this when you need to know what a deployed agent is actually doing — which prompts it answered, how the LLM calls performed, and where a request failed — with all three telemetry signals in one backend. This recipe layers observability onto the **Kyma** deployment from **[02-deploy-btp](../../02-deploy-btp/)**; work through checkpoint 2 (Kyma route) first, then come back here.
+Use this guide to plan logs, traces, and metrics for an instrumented Kyma application.
+The [Kyma mock recipe](../../02-deploy-btp/) does not provide LiteLLM instrumentation or the `telemetry.enabled` chart interface.
+Its deployment does not establish compatibility with this guide.
+Test the telemetry integration, live signals, and cleanup separately.
 
 > **Before you start**
 > - Run [`recipes/optional/region-preflight/`](../../optional/region-preflight/) to confirm the `cloud-logging` service is listed and entitled in the target region. It is **not** in every region (see the region table above).
 > - Confirm the **Kyma Telemetry module** is enabled on the cluster: `kubectl get telemetry -n kyma-system`. The `LogPipeline`/`TracePipeline`/`MetricPipeline` CRDs come from it.
-> - This recipe assumes the **Kyma** route from 02-deploy-btp. For a Cloud Foundry deployment, the app instrumentation still applies, but the pipeline wiring differs — see [`optional/observe-and-eval/`](../observe-and-eval/) for the CF `cf bind-service cloud-logging` shape.
+> - This guide requires a separately tested Kyma telemetry integration. Cloud Foundry needs different service and pipeline configuration.
 
 ## Prerequisites
 
-- A running Kyma deployment of the agent from **02-deploy-btp** (Helm release, Istio sidecar injection on).
+- A running instrumented application with a compatible chart and Istio configuration.
 - `cloud-logging` service entitlement in the subaccount, in a region where it is available.
 - Kyma Telemetry module enabled on the cluster.
 - The agent built on the SAP Cloud SDK (its `core.telemetry` module supplies the auto-instrumentation and span helpers this recipe uses).
@@ -180,7 +183,7 @@ kubectl logs deploy/<release>-server-deployment | grep -E '"trace_id"'
 # expect: JSON lines carrying trace_id/span_id after a request is handled
 ```
 
-Then send one real request (see 02-deploy-btp's client examples) and confirm in the **SAP Cloud Logging** dashboard:
+Then send a real request through the instrumented application and inspect the SAP Cloud Logging dashboard:
 
 - an `invoke_agent` span for the turn, with the auto-instrumented LiteLLM chat span and any `execute_tool` spans nested beneath it;
 - the `weather.requests` counter incrementing with an `outcome` label;
@@ -217,7 +220,7 @@ helm upgrade <release> ./charts/a2a-server --set telemetry.enabled=false
 
 ## Cross-references
 
-- [`recipes/02-deploy-btp/`](../../02-deploy-btp/) — the Kyma deployment this layers on.
+- [Existing-cluster mock recipe](../../02-deploy-btp/): a separate deployment reference without telemetry integration.
 - [`recipes/optional/observe-and-eval/`](../observe-and-eval/) — the broader observability + eval stub (CF-oriented binding shape, portable eval harness still TODO). This recipe is the validated Kyma realization of its observability half.
 - [`recipes/optional/region-preflight/`](../../optional/region-preflight/) — confirm `cloud-logging` availability in the target region.
 - [`skills/sap-sovereign-regions/references/btp-regional-availability.md`](../../../skills/sap-sovereign-regions/references/btp-regional-availability.md) — regional service availability.
