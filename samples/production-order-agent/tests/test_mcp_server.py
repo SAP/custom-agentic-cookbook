@@ -38,7 +38,9 @@ def test_s4_repository_uses_sandbox_header_and_relative_path() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json={"d": {"results": [{"StatusCode": "I0002"}]}})
+        return httpx.Response(
+            200, stream=httpx.ByteStream(b'{"d":{"results":[{"StatusCode":"I0002"}]}}')
+        )
 
     repository = mcp_server.S4Repository(
         mcp_server.DEFAULT_S4_BASE_URL,
