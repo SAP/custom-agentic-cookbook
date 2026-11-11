@@ -200,6 +200,6 @@ The [production-order sample guide](../../samples/production-order-agent/)
 contains the existing public production-order sandbox path.
 
 The [sovereign gateway recipe](../optional/sovereign-model-gateway/) requires a
-provider path beyond this mock baseline. Public toolkit MCP drivers, CAP,
+selected endpoint and model beyond this mock baseline. Public toolkit MCP drivers, CAP,
 durable HANA state, and automatic project generation are outside this local
 checkpoint.

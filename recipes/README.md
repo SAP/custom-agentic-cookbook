@@ -45,7 +45,7 @@ Deployment to an existing cluster does not require BTP provisioning automation.
 | --- | --- | --- |
 | [connect-data](optional/connect-data/) | Connect business records | The recipe describes sales orders. The public production-order sample already provides its own sandbox tools. |
 | [region-preflight](optional/region-preflight/) | Discover regional services | Requery availability before a regional deployment. |
-| [sovereign-model-gateway](optional/sovereign-model-gateway/) | Use an approved model endpoint | The recipe still assumes scaffolder and driver support beyond the public local starter. |
+| [sovereign-model-gateway](optional/sovereign-model-gateway/) | Use an approved model endpoint | The checked-in Python provider passes controlled gateway tests. Live provider and deployment evidence remain separate. |
 | [bring-your-own-model](optional/bring-your-own-model/) | Serve a custom model through AI Core | Serving and consuming paths need end-to-end proof. |
 | [hana-vector-store](optional/hana-vector-store/) | Retrieve document context | Existing scoped evidence does not prove the complete public tool integration. |
 | [hana-kg-triple-store](optional/hana-kg-triple-store/) | Query graph relationships | HANA loading, tool integration, and deployment need a complete public path. |
