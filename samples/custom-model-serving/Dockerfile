@@ -12,7 +12,7 @@ RUN mkdir /source && tar -xzf /tmp/llama.tar.gz --strip-components=1 -C /source
 RUN cmake -S /source -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_APP=OFF -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DLLAMA_SUBPROCESS=OFF -DLLAMA_OPENSSL=OFF -DBUILD_SHARED_LIBS=OFF -DGGML_OPENMP=OFF -DGGML_NATIVE=OFF -DGGML_CPU_ALL_VARIANTS=OFF \
     && cmake --build /build --target llama-server -j 4
 FROM alpine:3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
-RUN apk upgrade --no-cache && apk add --no-cache libstdc++
+RUN apk upgrade --no-cache && apk add --no-cache libstdc++ 'zlib>=1.4-r0'
 COPY --from=build /build/bin/llama-server /usr/local/bin/llama-server
 COPY --from=build /source/LICENSE /licenses/llama.cpp-MIT
 COPY --from=model /models/blobs/sha256-183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4 /models/qwen2.5-1.5b.gguf

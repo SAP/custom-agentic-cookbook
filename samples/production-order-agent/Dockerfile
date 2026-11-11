@@ -21,7 +21,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM ${BASE_IMAGE} AS runtime
 
-RUN /usr/local/bin/python -m pip uninstall --yes pip \
+RUN apk add --no-cache 'krb5-libs>=1.22.3-r0' 'zlib>=1.4-r0' \
+    && /usr/local/bin/python -m pip uninstall --yes pip \
     && /usr/local/bin/python -c 'import ensurepip, pathlib, shutil; shutil.rmtree(pathlib.Path(ensurepip.__file__).parent)' \
     && addgroup -S -g 10001 appgroup \
     && adduser -S -D -H -u 10001 -G appgroup -s /sbin/nologin appuser
