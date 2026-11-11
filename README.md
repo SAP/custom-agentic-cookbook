@@ -104,7 +104,7 @@ Use these optional recipes when the core path needs another capability:
 
 | Recipe | Use it to |
 | --- | --- |
-| [Connect business data](recipes/optional/connect-data/) | Add S/4HANA, SuccessFactors, or another HTTP API |
+| [Connect sandbox data](recipes/optional/connect-data/) | Read production-order records through the public SAP sandbox and verify the agent reply |
 | [Check regional availability](recipes/optional/region-preflight/) | Validate services in sovereign, regulated, or unfamiliar regions |
 | [Use an approved model gateway](recipes/optional/sovereign-model-gateway/) | Summarize the standalone Python sample's records with an approved OpenAI-compatible endpoint |
 | [Bring your own model](recipes/optional/bring-your-own-model/) | Serve a custom model through SAP AI Core |

@@ -43,7 +43,7 @@ Deployment to an existing cluster does not require BTP provisioning automation.
 
 | Recipe | Capability | Current limitation |
 | --- | --- | --- |
-| [connect-data](optional/connect-data/) | Connect business records | The recipe describes sales orders. The public production-order sample already provides its own sandbox tools. |
+| [connect-data](optional/connect-data/) | Read production-order sandbox records and compare the completed agent reply | Local Python sample only; sandbox demonstration records do not prove customer tenant access. |
 | [region-preflight](optional/region-preflight/) | Discover regional services | Requery availability before a regional deployment. |
 | [sovereign-model-gateway](optional/sovereign-model-gateway/) | Use an approved model endpoint | The checked-in Python provider passes controlled gateway tests. Live provider and deployment evidence remain separate. |
 | [bring-your-own-model](optional/bring-your-own-model/) | Serve a custom model through AI Core | Serving and consuming paths need end-to-end proof. |
