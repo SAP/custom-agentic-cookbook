@@ -157,14 +157,58 @@ It compares both backend datasets with the gateway request and the response with
 It requires the expected statuses, operation numbers, and delay assessment.
 It stops only its owned processes and requires their ports to close.
 The fixture does not prove external model inference.
-For a separately approved local Qwen serving image, supply its loopback API prefix with --model-url.
-The custom-model serving recipe supplies that separate model image and its inference gate.
+The optional `--model-url` flag is a diagnostic for a separately approved
+loopback gateway. Direct free-text Qwen2.5 1.5B replies failed the required
+business-accuracy check; that route is not a validated model path.
+For this pinned model, use the structured bridge path below.
 Gateway input is bounded to 200 records per tool and 64 KiB of serialized business data.
 The completion request sets max_tokens to 2048. The gateway must support that
 field and a nonstreaming JSON response with identity encoding. The client
 stops reading above 128 KiB, rejects assistant text above 16 KiB, and limits
 the complete request to 30 seconds. Over-limit responses close the connection
 and return a safe failure; they never become a mock answer.
+
+## Validated local model path
+
+The checked-in private bridge converts the gateway's business records into a
+schema-constrained model request. It validates every returned status name,
+operation identifier, confirmation and potential-delay identifier against the
+backend-derived values. A missing or changed fact fails the request without a
+mock answer. Caller prompts and gateway bearer keys do not reach the model.
+
+Build and run the local path from the Cookbook root:
+
+```bash
+docker build --platform linux/amd64 -t cookbook-qwen:local samples/custom-model-serving
+docker build --platform linux/amd64 -f samples/production-order-agent/Dockerfile.model-consumer -t cookbook-gateway:local samples/production-order-agent
+python3 samples/production-order-agent/scripts/smoke_gateway_bridge.py --model-image cookbook-qwen:local --consumer-image cookbook-gateway:local
+```
+
+The [local serving sample](../../../samples/custom-model-serving/) includes all
+model build sources and upstream license details. Docker and Python 3.12 or
+newer are required. Building downloads about 986 MB of public model data;
+running the test makes no external request and publishes no host port.
+
+The command starts an owned local model, structured bridge, MCP server and A2A
+agent. It verifies eight phases with non-default synthetic order 7654321:
+
+- Gzip and deflate S/4 responses produce exact status and operation results.
+- Data, OAuth and inference refusals produce safe failed A2A tasks, skip the
+  appropriate downstream calls and never return a mock answer.
+- Restoring each failed boundary produces the exact result in the same
+  running agent, without restarting its MCP or bridge process.
+
+Actual Qwen inference generates the accepted structured replies. S/4 records
+and OAuth remain synthetic fixtures. The gateway retains its 30-second total
+request deadline; this local bridge uses the existing custom-adapter timeout
+setting at 25 seconds. CPU emulation or constrained hosts can exceed that
+budget, in which case the test must fail rather than weaken the deadline.
+
+The command reaps its helper processes, verifies their ports close, and removes
+only its uniquely owned containers. The normal Compose gateway path above
+still requires your approved external gateway; the smoke command does not
+silently reconfigure it. This local result does not prove cloud OAuth,
+deployment, sovereign residency or production readiness.
 
 ## Troubleshooting
 

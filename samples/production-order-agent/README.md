@@ -1,5 +1,10 @@
 # Production Order Agent
 
+For the pinned local Qwen model, use the
+[structured gateway smoke path](../../recipes/optional/sovereign-model-gateway/#validated-local-model-path).
+It verifies real model inference, safe refusals, same-agent recovery and cleanup.
+Direct free-text Qwen summaries remain unqualified for business accuracy.
+
 > **Status:** Experimental business example. It is designed for local and
 > container demonstrations, not production use.
 
