@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import copy
+import json
+import logging
 import os
 from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+MAX_RESPONSE_BYTES = 1048576
 
 DEFAULT_S4_BASE_URL = (
     "https://sandbox.api.sap.com/s4hanacloud/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
@@ -99,19 +103,46 @@ class S4Repository:
         self.transport = transport
 
     def fetch(self, manufacturing_order: str, navigation: str) -> list[dict[str, Any]]:
-        with httpx.Client(
-            base_url=self.base_url,
-            headers={"APIKey": self.api_key, "Accept": "application/json"},
-            timeout=20,
-            transport=self.transport,
-        ) as client:
-            response = client.get(order_path(manufacturing_order, navigation))
-
         try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"S/4 request failed with HTTP {response.status_code}") from exc
-        return normalize_odata(response.json())
+            with (
+                httpx.Client(
+                    base_url=self.base_url,
+                    headers={
+                        "APIKey": self.api_key,
+                        "Accept": "application/json",
+                        "Accept-Encoding": "identity",
+                    },
+                    timeout=20,
+                    transport=self.transport,
+                    trust_env=False,
+                ) as client,
+                client.stream("GET", order_path(manufacturing_order, navigation)) as response,
+            ):
+                if response.status_code >= 300:
+                    raise RuntimeError(
+                        f"S/4 request failed with HTTP {response.status_code}"
+                    ) from None
+                if (
+                    response.headers.get("Content-Encoding", "identity").strip().lower()
+                    != "identity"
+                ):
+                    raise RuntimeError("S/4 response encoding must be identity")
+                body = bytearray()
+                for chunk in response.iter_bytes():
+                    if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                        raise RuntimeError("S/4 response exceeds the one MiB bound")
+                    body.extend(chunk)
+        except httpx.TimeoutException:
+            raise RuntimeError("S/4 request timed out") from None
+        except (httpx.RequestError, httpx.InvalidURL):
+            raise RuntimeError("S/4 request could not reach the backend") from None
+        try:
+            payload = json.loads(body)
+            if not isinstance(payload, dict):
+                raise ValueError("expected an OData envelope")
+        except (ValueError, UnicodeDecodeError):
+            raise RuntimeError("S/4 returned malformed OData") from None
+        return normalize_odata(payload)
 
 
 def _mock_fetch(manufacturing_order: str, field: str) -> list[dict[str, Any]]:
@@ -141,6 +172,8 @@ def create_mcp_server() -> FastMCP:
         host=os.getenv("MCP_HOST", "127.0.0.1"),
         port=int(os.getenv("MCP_PORT", "8090")),
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     @server.tool()
     def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:

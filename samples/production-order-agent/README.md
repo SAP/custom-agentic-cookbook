@@ -156,6 +156,10 @@ change does not establish production readiness.
 
 ## Use the public SAP S/4HANA sandbox
 
+Follow the [connect-data recipe](../../recipes/optional/connect-data/) for the
+local production-order path and a repeatable comparison with backend records.
+The recipe uses the existing connector and keeps the model provider in mock mode.
+
 The workshop's pro-code path used organizer-managed runtime credentials rather
 than asking each participant to obtain them. For this self-contained sample,
 obtain your own free SAP Business Accelerator Hub API key:
@@ -312,3 +316,10 @@ The chart keeps one agent replica and prevents overlapping replicas during upgra
 Its default services stay inside the cluster and provide no application authentication.
 Approve image publication, deployment, optional public exposure, and cleanup separately.
 This path does not deploy toolkit-generated projects or configure live data, model providers, HANA, or Joule.
+
+## S/4 transport limits
+
+The S/4 client rejects response bodies larger than one MiB.
+It requests identity encoding and rejects compressed responses before it reads their bodies.
+It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
+The MCP process omits endpoint addresses from HTTP transport logs.
