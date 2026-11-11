@@ -227,7 +227,12 @@ class ProductionOrderAgent:
                 "get_production_order_operations",
                 manufacturing_order,
             ),
+            return_exceptions=True,
         )
+        # Finish both bounded tool calls before reporting a failure or starting recovery.
+        for result in (statuses, operations):
+            if isinstance(result, BaseException):
+                raise result
 
         if self.settings.llm_provider == "mock":
             return deterministic_summary(manufacturing_order, statuses, operations)

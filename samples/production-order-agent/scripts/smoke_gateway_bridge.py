@@ -118,6 +118,7 @@ def run(model_image: str, consumer_image: str) -> dict:
         summaries = [json.loads(line[8:]) for line in lines if line.startswith("SUMMARY ")]
         report["gateway_cleanup"] = summaries[-1] if summaries else None
         if output.returncode or state["ExitCode"] or len(report["phases"]) != 8:
+            report["fixture_diagnostic"] = output.stderr
             raise RuntimeError("Gateway bridge business, refusal or recovery check failed")
         phases_passed = True
     finally:
