@@ -43,6 +43,7 @@ Deployment to an existing cluster does not require BTP provisioning automation.
 
 | Recipe | Capability | Current limitation |
 | --- | --- | --- |
+| [coding-assistant](optional/coding-assistant/) | Adapt an existing local agent | Development-time practice with a pinned mock exercise; no BTP or toolkit required. |
 | [connect-data](optional/connect-data/) | Connect business records | The recipe describes sales orders. The public production-order sample already provides its own sandbox tools. |
 | [region-preflight](optional/region-preflight/) | Discover regional services | Requery availability before a regional deployment. |
 | [sovereign-model-gateway](optional/sovereign-model-gateway/) | Use an approved model endpoint | The recipe still assumes scaffolder and driver support beyond the public local starter. |

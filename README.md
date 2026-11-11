@@ -104,6 +104,7 @@ Use these optional recipes when the core path needs another capability:
 
 | Recipe | Use it to |
 | --- | --- |
+| [Build with your coding assistant](recipes/optional/coding-assistant/) | Adapt a local agent with reviewed changes, real replies, and cleanup |
 | [Connect business data](recipes/optional/connect-data/) | Add S/4HANA, SuccessFactors, or another HTTP API |
 | [Check regional availability](recipes/optional/region-preflight/) | Validate services in sovereign, regulated, or unfamiliar regions |
 | [Use a sovereign model gateway](recipes/optional/sovereign-model-gateway/) | Use an approved OpenAI-compatible endpoint where SAP AI Core is unavailable |
