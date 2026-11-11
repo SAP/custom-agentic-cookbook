@@ -1,0 +1,14 @@
+# Select explicitly with: docker compose -f compose.yaml -f compose.custom-model.yaml up --build
+services:
+  agent:
+    build:
+      dockerfile: Dockerfile.model-consumer
+    environment:
+      LLM_PROVIDER: aicore-custom
+      MODEL_NAME: ${MODEL_NAME:-qwen2.5:1.5b}
+      AICORE_CLIENT_ID: ${AICORE_CLIENT_ID:?Export the approved client ID}
+      AICORE_CLIENT_SECRET: ${AICORE_CLIENT_SECRET:?Export the approved client secret}
+      AICORE_RESOURCE_GROUP: ${AICORE_RESOURCE_GROUP:?Export the selected resource group}
+      AICORE_TOKEN_URL: ${AICORE_TOKEN_URL:?Export the exact OAuth token endpoint}
+      AICORE_CUSTOM_DEPLOYMENT_URL: ${AICORE_CUSTOM_DEPLOYMENT_URL:?Export the selected deployment URL}
+      AICORE_CUSTOM_TIMEOUT_SECONDS: ${AICORE_CUSTOM_TIMEOUT_SECONDS:-180}

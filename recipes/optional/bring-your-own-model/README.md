@@ -1,161 +1,154 @@
-# Optional: Bring Your Own Model on SAP AI Core
+# Custom model on SAP AI Core
 
-> Flow: This is a separate AI Core serving and consuming path. Use [region preflight](../region-preflight/) for regional context.
-> Input: An approved AI Core provider, available entitlement, reachable registry, and repository connected to AI Core for ServingTemplate manifests.
-> Output: A custom AI Core deployment and an agent that consumes it. Its generated project needs separate deployment packaging and tests.
-> **Toolkit command:** `/sap-a2a-agent-toolkit:create-agent byom-agent --framework cap --taskstore hana --llm-provider aicore`.
+This recipe includes a pinned llama.cpp CPU serving image, a Qwen2.5 1.5B model, and an OAuth-aware production-order consumer.
+Local tests remain separate from AI Core deployment proof.
+Keep the recipe partial until the selected AI Core deployment and deployed A2A application pass the live tests.
 
-The [Kyma mock recipe](../../02-deploy-btp/) does not deploy this model-enabled generated project.
-Test custom serving, agent consumption, and deployment packaging separately.
+Use the public [production-order starter](../../../samples/production-order-agent/) and the separate [serving assets](../../../samples/custom-model-serving/).
+The default mock provider and A2A v1 interface remain compatible.
+Select LLM_PROVIDER=aicore-custom only for this custom deployment path.
+The foundation-model provider remains a separate integration.
 
-Use this when a customer wants to host a custom LLM behind SAP AI Core, for example Ollama serving Gemma, and the target subaccount already has SAP AI Core entitlement and quota.
+The [Kyma mock recipe](../../02-deploy-btp/) deploys the fixed mock sample.
+Use the separate consumer manifests below for this model-enabled path.
 
-> ⚠ Region: This is an SAP AI Core recipe. Use it only where AI Core is listed and entitled, such as commercial regions or KSA regulated after preflight. For China Landing, NS2, and KSA non-regulated, use [`recipes/optional/sovereign-model-gateway/`](../sovereign-model-gateway/) with `--llm-provider openai-compatible` against a customer-approved gateway.
-
-## When to use it
-
-- You need to serve a model that is not available in the foundation-model catalog.
-- The customer accepts running the model as an AI Core custom serving deployment.
-- The image registry, model source, and runtime path are approved for the target region.
-
-Do not use this to bypass regional availability. If AI Core is not in-region, keep the agent on `openai-compatible` instead.
+Use this recipe only where AI Core is available and entitled. For regions without
+AI Core, assess the [sovereign model gateway](../sovereign-model-gateway/) and an
+approved OpenAI-compatible endpoint. Custom serving does not bypass regional availability.
 
 ## Prerequisites
 
-- SAP AI Core standard or extended plan entitlement and quota.
-- SAP AI Launchpad access for repository, application, configuration, and deployment setup.
-- Container registry reachable from SAP AI Core.
-- Docker access token or customer-approved registry credentials stored as an AI Core Docker registry secret.
-- Git repository connected to AI Core for workflow templates.
-- Region preflight completed: [`recipes/optional/region-preflight/`](../region-preflight/).
+Complete [regional preflight](../region-preflight/) for the selected AI Core target.
+Use the AI Core extended plan for the test deployment.
+Review the model license, image digest, resource plan, registry, watched Git path, and estimated service cost before live changes.
+Keep each test in its own resource group.
+Use an existing approved credential Secret for the consuming application.
 
-## Scaffold
+## Local serving
 
-Create the consuming A2A agent with the AI Core provider only after preflight confirms AI Core for the subaccount:
-
-```bash
-/sap-a2a-agent-toolkit:create-agent byom-agent \
-  --framework cap \
-  --taskstore hana \
-  --landscape <landscape> \
-  --llm-provider aicore
-```
-
-Fallback for sovereign regions without AI Core:
+From the Cookbook root, build the reviewed amd64 image:
 
 ```bash
-/sap-a2a-agent-toolkit:create-agent byom-agent \
-  --framework cap \
-  --taskstore hana \
-  --landscape <landscape> \
-  --llm-provider openai-compatible
+docker build --platform linux/amd64 -t cookbook-qwen:local samples/custom-model-serving
 ```
 
-## Configure
+The build loads qwen2.5:1.5b and requires its exact manifest digest.
+Runtime uses that model from the image and requires no model download.
+The image runs as UID/GID 10001 and listens on port 8080.
+Read the serving README for the loopback test and exact cleanup commands.
 
-Add a serving template to the repository path that AI Core watches, for example `LearningScenarios/ollama.yaml`:
+## Custom deployment consumer
 
-```yaml
-apiVersion: ai.sap.com/v1alpha1
-kind: ServingTemplate
-metadata:
-  name: ollama
-  annotations:
-    scenarios.ai.sap.com/description: "Run an Ollama server on SAP AI Core"
-    scenarios.ai.sap.com/name: "ollama"
-    executables.ai.sap.com/description: "ollama service"
-    executables.ai.sap.com/name: "ollama"
-  labels:
-    scenarios.ai.sap.com/id: "ollama"
-    ai.sap.com/version: "0.0.1"
-spec:
-  template:
-    apiVersion: "serving.kserve.io/v1beta1"
-    metadata:
-      annotations: |
-        autoscaling.knative.dev/metric: concurrency
-        autoscaling.knative.dev/target: 1
-        autoscaling.knative.dev/targetBurstCapacity: 0
-      labels: |
-        ai.sap.com/resourcePlan: infer.s
-    spec: |
-      predictor:
-        imagePullSecrets:
-          - name: <docker-secret-name>
-        minReplicas: 1
-        maxReplicas: 1
-        containers:
-          - name: kserve-container
-            image: <registry>/<namespace>/ollama:ai-core
-            ports:
-              - containerPort: 8080
-                protocol: TCP
-```
-
-Build and push the Ollama image from the SAP tutorial, substituting the customer-approved registry:
+From the Cookbook root, build the separate consumer image:
 
 ```bash
-docker login <registry>
-docker build --platform=linux/amd64 -t <registry>/<namespace>/ollama:ai-core .
-docker push <registry>/<namespace>/ollama:ai-core
+docker build --platform linux/amd64 \
+  --file samples/production-order-agent/Dockerfile.model-consumer \
+  --tag cookbook-custom-consumer:local \
+  samples/production-order-agent
 ```
 
-In SAP AI Launchpad:
+`Dockerfile.model-consumer` installs the frozen base dependencies used by
+`LLM_PROVIDER=aicore-custom` and the mock MCP server. This OAuth-aware custom
+provider uses `httpx` and does not require the optional SAP foundation-model SDK.
+The standard `Dockerfile` includes that SDK for `LLM_PROVIDER=aicore`.
 
-1. Add the Docker registry secret.
-2. Add the Git repository path that contains `LearningScenarios/ollama.yaml`.
-3. Create an AI Core application from that path.
-4. Create a configuration with `scenario_id=ollama` and `executable_id=ollama`.
-
-## Deploy
-
-Create the deployment from the AI Core configuration and wait until it is `RUNNING`.
-
-Then pull the model into the Ollama deployment using the AI API endpoint exposed for that deployment. The SAP tutorial uses Gemma as the example model; choose the model only after customer approval of model license, residency, and quality.
-
-## Verify it works
-
-Confirm the deployment is running:
+For a local two-service consumer and MCP stack, export the custom-model variables
+below and select the explicit override from the sample directory:
 
 ```bash
-curl -s "$AICORE_BASE_URL/v2/lm/deployments/<deployment-id>" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "AI-Resource-Group: $AICORE_RESOURCE_GROUP" \
-  | jq -r .status
+docker compose -f compose.yaml -f compose.custom-model.yaml up --build
 ```
 
-Expect:
+Stop its exact stack with the same files:
+
+```bash
+docker compose -f compose.yaml -f compose.custom-model.yaml down
+```
+
+The override builds only the agent with `Dockerfile.model-consumer`. The default
+Compose flow retains the fixed mock provider, and MCP retains `Dockerfile.mock`.
+The standard SDK image remains optional; redistribution requires a separate
+review of the [SAP Developer License Agreement](https://pypi.org/project/sap-ai-sdk-base/3.4.0/).
+
+For the local consumer tests, install the frozen starter dependencies:
+
+```bash
+cd samples/production-order-agent
+uv sync --frozen --group dev
+uv run --frozen --group dev pytest -q tests/test_custom_model.py
+```
+
+Set these variables through the approved application Secret or an owner-only local environment:
 
 ```text
-RUNNING
+LLM_PROVIDER=aicore-custom
+MODEL_NAME=qwen2.5:1.5b
+AICORE_TOKEN_URL=<exact-OAuth-token-endpoint>
+AICORE_CUSTOM_DEPLOYMENT_URL=<deployment-response-deploymentUrl>
+AICORE_RESOURCE_GROUP=<test-resource-group>
+AICORE_CLIENT_ID=<approved-client-id>
+AICORE_CLIENT_SECRET=<approved-client-secret>
 ```
 
-Then send a minimal inference request through the deployment endpoint and confirm the A2A agent can call the configured AI Core deployment without falling back to a local `localhost` endpoint.
+Use deploymentUrl from the AI Core deployment response.
+The consumer appends /v1/chat/completions to that URL.
+The status API under /v2/lm/deployments is not an inference endpoint.
+The consumer acquires a fresh OAuth token for each summary and retries once after an inference HTTP 401.
+It disables redirects and ambient proxies and keeps TLS enabled.
+It closes each HTTP client after the request.
+The default timeout is 180 seconds. AICORE_CUSTOM_TIMEOUT_SECONDS accepts an explicit value from 1 to 300 seconds.
+Model input contains at most 200 records per tool and 64 KiB of serialized business data.
+The consumer normalizes status, confirmation, and delay facts with the existing deterministic summary rules.
+A JSON schema defines JSON fields and types.
+The consumer requires all statuses, operation IDs, confirmation labels, and delayed operation IDs in the model reply.
+It rejects a reply that omits or changes those source facts.
+The A2A artifact contains that structured model reply.
+This path proves constrained inference. Open-ended model reasoning remains outside its acceptance result.
+Credentials stay in transport headers or the OAuth exchange.
+A failed request produces a failed A2A task without a mock fallback.
 
-## Troubleshooting
+After reviewing and publishing the consumer image to your registry, record its
+immutable registry manifest digest. In an ignored copy of
+`samples/custom-model-serving/consumer-deployment.yaml`, replace both
+`REPLACE_WITH_REVIEWED_AGENT_IMAGE_DIGEST` entries with that same
+`<repository>@sha256:<digest>` reference. The agent and mock MCP process use the
+same consumer image. Keep application and registry credentials in the referenced
+Secrets, and review the complete manifest before deployment approval.
 
-- `ImagePullBackOff`: check the AI Core Docker registry secret, registry host, image tag, and whether the registry is reachable from the region.
-- `403` from AI API: check `AI-Resource-Group`, token audience, service binding, and whether the application/configuration belongs to the same resource group.
-- Deployment starts but inference fails: confirm Ollama listens on port `8080` through the reverse proxy and the model was pulled into the running deployment.
+## AI Core preparation
 
-## Cleanup or rollback
+Copy serving-template.yaml from the serving assets into an ignored local directory.
+Replace its registry Secret name and image placeholder with the approved values.
+Use the tested image digest and the reviewed infer.s plan.
+The template requests one replica.
 
-- Stop or delete the AI Core deployment when not in active use.
-- Delete unused configurations and applications from SAP AI Launchpad.
-- Remove registry credentials that were created only for the pilot.
-- Keep the A2A agent source; switch it back to `--llm-provider openai-compatible` if the region cannot run AI Core.
+After separate approval for each live operation, register the image credentials, watched repository, and application in AI Core.
+Create the configuration for scenario cookbook-custom-model and executable cookbook-qwen-small.
+After deployment approval, create its deployment and wait for RUNNING with a deploymentUrl.
+The image already contains the model. Do not pull a different model into the running deployment.
 
-## Region-specific notes
+## Verification
 
-- Commercial: use this when AI Core entitlement, quota, and customer residency approval are in place.
-- KSA regulated: viable only after preflight confirms AI Core in the customer subaccount; validate NDMO residency and Arabic-language quality.
-- China Landing, NS2, KSA non-regulated: use [`recipes/optional/sovereign-model-gateway/`](../sovereign-model-gateway/) instead.
+Send an authenticated inference request through the selected deploymentUrl.
+Require a nonempty answer from qwen2.5:1.5b in the selected resource group.
+Then deploy the separate consumer assets after deployment approval.
+Send a real A2A question about order 1000000 through both mock MCP tools.
+Require Released, Partially Confirmed, operations 0010 and 0020, and a delay assessment for unconfirmed operation 0020.
+Compare the model response with the completed A2A artifact.
+Record the final commit, model digest, image digest, resource group, deployment state, inference result, and cleanup result separately.
+Local protocol tests do not satisfy this live gate.
 
-## Changes under BAIP
+## Cleanup
 
-When BAIP is available in the target region, replace the custom AI Core deployment path with the BAIP-native model onboarding path. Keep the A2A endpoint, HANA task store, tool APIs, and regional preflight workflow.
+Obtain approval for the exact live resources first.
+Remove only the test deployment, configuration, watched application, consumer release, and test-owned credential references.
+Make sure that those exact resources disappear.
+Preserve shared instances, registries, and credentials.
+The serving README lists exact local container cleanup.
 
-## Source
+## Sources
 
-- SAP Developers tutorial: [Using Custom models on SAP AI Core VIA ollama](https://developers.sap.com/tutorials/ai-core-custom-llm..html).
-- Regional availability guardrail: run [`recipes/optional/region-preflight/`](../region-preflight/) against the target subaccount.
+[llama.cpp OpenAI compatibility](https://github.com/ggml-org/llama.cpp/blob/8642541b255bfb5dc39cd351a178be09013a55d6/tools/server/README.md) defines the inference route.
+[Qwen2.5 1.5B Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) supplies the upstream model and license.
+[SAP custom-model tutorial](https://developers.sap.com/tutorials/ai-core-custom-llm.html) describes AI Core serving integration.
