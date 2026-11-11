@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import copy
+import json
+import logging
 import os
+import zlib
 from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+MAX_RESPONSE_BYTES = 1048576
 
 DEFAULT_S4_BASE_URL = (
     "https://sandbox.api.sap.com/s4hanacloud/sap/opu/odata/sap/API_PRODUCTION_ORDER_2_SRV"
@@ -82,6 +87,45 @@ def normalize_odata(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
+def _read_response(response: httpx.Response) -> bytearray:
+    """Bound wire bytes and decoded output before parsing untrusted JSON."""
+    encoding = response.headers.get("Content-Encoding", "identity").strip().lower()
+    if encoding not in {"identity", "gzip", "deflate"}:
+        raise RuntimeError("S/4 response uses unsupported encoding; use identity, gzip or deflate")
+    window = zlib.MAX_WBITS + 16 if encoding == "gzip" else zlib.MAX_WBITS
+    decoder = None if encoding == "identity" else zlib.decompressobj(window)
+    body = bytearray()
+    raw_bytes = 0
+    try:
+        # iter_bytes() automatically decompresses before we can bound allocations.
+        for chunk in response.iter_raw():
+            raw_bytes += len(chunk)
+            if raw_bytes > MAX_RESPONSE_BYTES:
+                raise RuntimeError("S/4 raw response exceeds the one MiB bound")
+            while chunk:
+                if decoder is None:
+                    decoded = chunk
+                    chunk = b""
+                else:
+                    if decoder.eof:
+                        if encoding != "gzip":
+                            raise RuntimeError(
+                                "S/4 returned malformed compressed response"
+                            ) from None
+                        # gzip permits concatenated members; the cap covers all of them.
+                        decoder = zlib.decompressobj(window)
+                    decoded = decoder.decompress(chunk, MAX_RESPONSE_BYTES - len(body) + 1)
+                    chunk = decoder.unused_data
+                if len(body) + len(decoded) > MAX_RESPONSE_BYTES:
+                    raise RuntimeError("S/4 decoded response exceeds the one MiB bound")
+                body.extend(decoded)
+        if decoder is not None and not decoder.eof:
+            raise RuntimeError("S/4 returned malformed compressed response") from None
+    except zlib.error:
+        raise RuntimeError("S/4 returned malformed compressed response") from None
+    return body
+
+
 class S4Repository:
     def __init__(
         self,
@@ -99,19 +143,37 @@ class S4Repository:
         self.transport = transport
 
     def fetch(self, manufacturing_order: str, navigation: str) -> list[dict[str, Any]]:
-        with httpx.Client(
-            base_url=self.base_url,
-            headers={"APIKey": self.api_key, "Accept": "application/json"},
-            timeout=20,
-            transport=self.transport,
-        ) as client:
-            response = client.get(order_path(manufacturing_order, navigation))
-
         try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"S/4 request failed with HTTP {response.status_code}") from exc
-        return normalize_odata(response.json())
+            with (
+                httpx.Client(
+                    base_url=self.base_url,
+                    headers={
+                        "APIKey": self.api_key,
+                        "Accept": "application/json",
+                        "Accept-Encoding": "identity",
+                    },
+                    timeout=20,
+                    transport=self.transport,
+                    trust_env=False,
+                ) as client,
+                client.stream("GET", order_path(manufacturing_order, navigation)) as response,
+            ):
+                if response.status_code >= 300:
+                    raise RuntimeError(
+                        f"S/4 request failed with HTTP {response.status_code}"
+                    ) from None
+                body = _read_response(response)
+        except httpx.TimeoutException:
+            raise RuntimeError("S/4 request timed out") from None
+        except (httpx.RequestError, httpx.InvalidURL):
+            raise RuntimeError("S/4 request could not reach the backend") from None
+        try:
+            payload = json.loads(body)
+            if not isinstance(payload, dict):
+                raise ValueError("expected an OData envelope")
+        except (ValueError, UnicodeDecodeError):
+            raise RuntimeError("S/4 returned malformed OData") from None
+        return normalize_odata(payload)
 
 
 def _mock_fetch(manufacturing_order: str, field: str) -> list[dict[str, Any]]:
@@ -141,6 +203,8 @@ def create_mcp_server() -> FastMCP:
         host=os.getenv("MCP_HOST", "127.0.0.1"),
         port=int(os.getenv("MCP_PORT", "8090")),
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     @server.tool()
     def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:
