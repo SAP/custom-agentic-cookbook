@@ -1,0 +1,9 @@
+# Fill these coordinates using update_image.py after testing and publishing the image.
+image:
+  repository: ""
+  tag: ""
+  digest: ""
+imagePullSecrets: []
+replicaCount: 1
+apirule:
+  enabled: false
