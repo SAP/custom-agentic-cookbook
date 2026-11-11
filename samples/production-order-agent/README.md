@@ -319,7 +319,10 @@ This path does not deploy toolkit-generated projects or configure live data, mod
 
 ## S/4 transport limits
 
-The S/4 client rejects response bodies larger than one MiB.
-It requests identity encoding and rejects compressed responses before it reads their bodies.
+The S/4 client limits both transferred and decoded response bodies to one MiB.
+It requests identity encoding, but also accepts gzip and zlib-wrapped deflate if
+an intermediary compresses the response. Decoding stops as soon as either limit
+is exceeded. Unsupported encodings and malformed or truncated compression fail
+with a safe diagnostic, and the response stream closes.
 It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
 The MCP process omits endpoint addresses from HTTP transport logs.

@@ -29,7 +29,10 @@ def s4_backend(monkeypatch: pytest.MonkeyPatch) -> dict:
     def handler(request: httpx.Request) -> httpx.Response:
         state["requests"].append(request)
         record = next(record for nav, record in TOOLS.values() if nav in request.url.path)
-        return httpx.Response(state["status"], json={"d": {"results": [record]}})
+        return httpx.Response(
+            state["status"],
+            stream=httpx.ByteStream(json.dumps({"d": {"results": [record]}}).encode()),
+        )
 
     real_client = httpx.Client
 

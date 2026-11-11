@@ -6,6 +6,7 @@ import copy
 import json
 import logging
 import os
+import zlib
 from typing import Any
 
 import httpx
@@ -86,6 +87,45 @@ def normalize_odata(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
+def _read_response(response: httpx.Response) -> bytearray:
+    """Bound wire bytes and decoded output before parsing untrusted JSON."""
+    encoding = response.headers.get("Content-Encoding", "identity").strip().lower()
+    if encoding not in {"identity", "gzip", "deflate"}:
+        raise RuntimeError("S/4 response uses unsupported encoding; use identity, gzip or deflate")
+    window = zlib.MAX_WBITS + 16 if encoding == "gzip" else zlib.MAX_WBITS
+    decoder = None if encoding == "identity" else zlib.decompressobj(window)
+    body = bytearray()
+    raw_bytes = 0
+    try:
+        # iter_bytes() automatically decompresses before we can bound allocations.
+        for chunk in response.iter_raw():
+            raw_bytes += len(chunk)
+            if raw_bytes > MAX_RESPONSE_BYTES:
+                raise RuntimeError("S/4 raw response exceeds the one MiB bound")
+            while chunk:
+                if decoder is None:
+                    decoded = chunk
+                    chunk = b""
+                else:
+                    if decoder.eof:
+                        if encoding != "gzip":
+                            raise RuntimeError(
+                                "S/4 returned malformed compressed response"
+                            ) from None
+                        # gzip permits concatenated members; the cap covers all of them.
+                        decoder = zlib.decompressobj(window)
+                    decoded = decoder.decompress(chunk, MAX_RESPONSE_BYTES - len(body) + 1)
+                    chunk = decoder.unused_data
+                if len(body) + len(decoded) > MAX_RESPONSE_BYTES:
+                    raise RuntimeError("S/4 decoded response exceeds the one MiB bound")
+                body.extend(decoded)
+        if decoder is not None and not decoder.eof:
+            raise RuntimeError("S/4 returned malformed compressed response") from None
+    except zlib.error:
+        raise RuntimeError("S/4 returned malformed compressed response") from None
+    return body
+
+
 class S4Repository:
     def __init__(
         self,
@@ -122,16 +162,7 @@ class S4Repository:
                     raise RuntimeError(
                         f"S/4 request failed with HTTP {response.status_code}"
                     ) from None
-                if (
-                    response.headers.get("Content-Encoding", "identity").strip().lower()
-                    != "identity"
-                ):
-                    raise RuntimeError("S/4 response encoding must be identity")
-                body = bytearray()
-                for chunk in response.iter_bytes():
-                    if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
-                        raise RuntimeError("S/4 response exceeds the one MiB bound")
-                    body.extend(chunk)
+                body = _read_response(response)
         except httpx.TimeoutException:
             raise RuntimeError("S/4 request timed out") from None
         except (httpx.RequestError, httpx.InvalidURL):

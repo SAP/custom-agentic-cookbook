@@ -42,7 +42,9 @@ def backend(monkeypatch: pytest.MonkeyPatch) -> dict:
         data["requests"].append(request)
         if request.url.host == "backend.example.invalid":
             field = "statuses" if "to_ProductionOrderStatus" in request.url.path else "operations"
-            return httpx.Response(200, json={"d": {"results": data[field]}})
+            return httpx.Response(
+                200, stream=httpx.ByteStream(json.dumps({"d": {"results": data[field]}}).encode())
+            )
         assert request.headers["A2A-Version"] == "1.0"
         assert "APIKey" not in request.headers
         message = json.loads(request.content)["params"]["message"]

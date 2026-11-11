@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
 import json
 import os
 import socket
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +19,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import httpx
+import pytest
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
@@ -42,6 +45,7 @@ def port():
 
 class Fixture(BaseHTTPRequestHandler):
     behavior = "normal"
+    encoding = "identity"
     paths = []
 
     def log_message(self, *_):
@@ -53,8 +57,16 @@ class Fixture(BaseHTTPRequestHandler):
         status = 503 if type(self).behavior == "failure" else 200
         data = STATUSES if "to_ProductionOrderStatus" in self.path else OPERATIONS
         body = json.dumps({"d": {"results": data}}).encode()
+        if type(self).behavior == "oversized":
+            body = json.dumps({"padding": "x" * 2097152}).encode()
+        encoding = type(self).encoding
+        if encoding == "gzip":
+            body = gzip.compress(body)
+        elif encoding == "deflate":
+            body = zlib.compress(body)
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Encoding", encoding)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         with suppress(BrokenPipeError):
@@ -78,8 +90,9 @@ async def wait_for_mcp(url, deadline):
 
 
 @contextmanager
-def runtime():
+def runtime(encoding="identity"):
     Fixture.behavior = "normal"
+    Fixture.encoding = encoding
     Fixture.paths = []
     fixture = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     worker = threading.Thread(target=fixture.serve_forever, daemon=True)
@@ -220,8 +233,9 @@ def test_runtime_waits_for_mcp_when_agent_card_is_already_ready(monkeypatch, tmp
     assert not errors
 
 
-def test_fixture_records_reach_completed_a2a_artifact():
-    with runtime() as env:
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+def test_fixture_records_reach_completed_a2a_artifact(encoding):
+    with runtime(encoding) as env:
         task = send_message(env)
         assert task["status"]["state"] == "TASK_STATE_COMPLETED"
         answer = chr(10).join(
@@ -244,9 +258,11 @@ def test_fixture_records_reach_completed_a2a_artifact():
         assert all(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
 
 
-def test_backend_failure_produces_safe_failed_task_and_recovers():
-    with runtime() as env:
-        Fixture.behavior = "failure"
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+@pytest.mark.parametrize("failure", ["failure", "oversized"])
+def test_backend_failure_produces_safe_failed_task_and_recovers(encoding, failure):
+    with runtime(encoding) as env:
+        Fixture.behavior = failure
         task = send_message(env)
         assert any(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
         assert task["status"]["state"] == "TASK_STATE_FAILED"
@@ -263,8 +279,9 @@ def test_backend_failure_produces_safe_failed_task_and_recovers():
         assert "Partially Confirmed" not in answer
 
 
-def test_documented_data_smoke_compares_http_records_and_recovers():
-    with runtime() as env:
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+def test_documented_data_smoke_compares_http_records_and_recovers(encoding):
+    with runtime(encoding) as env:
         command = [
             sys.executable,
             str(Path(__file__).resolve().parents[1] / "scripts" / "smoke_data.py"),
