@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
 import json
 import os
 import socket
@@ -10,9 +11,11 @@ import subprocess
 import sys
 import threading
 import time
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, suppress
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -44,6 +47,7 @@ class Fixture(BaseHTTPRequestHandler):
     started = threading.Event()
     release = threading.Event()
     behavior = "normal"
+    encoding = "identity"
     paths = []
 
     def log_message(self, *_):
@@ -58,8 +62,16 @@ class Fixture(BaseHTTPRequestHandler):
         status = 503 if type(self).behavior == "failure" else 200
         data = STATUSES if "to_ProductionOrderStatus" in self.path else OPERATIONS
         body = json.dumps({"d": {"results": data}}).encode()
+        if type(self).behavior == "oversized":
+            body = json.dumps({"padding": "x" * 2097152}).encode()
+        encoding = type(self).encoding
+        if encoding == "gzip":
+            body = gzip.compress(body)
+        elif encoding == "deflate":
+            body = zlib.compress(body)
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Encoding", encoding)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         with suppress(BrokenPipeError):
@@ -83,8 +95,9 @@ async def wait_for_mcp(url, deadline):
 
 
 @contextmanager
-def runtime():
+def runtime(encoding="identity"):
     Fixture.behavior = "normal"
+    Fixture.encoding = encoding
     Fixture.paths = []
     Fixture.started.clear()
     Fixture.release.clear()
@@ -130,7 +143,7 @@ def runtime():
                 time.sleep(0.05)
             else:
                 raise RuntimeError("sample startup timed out")
-        # This fixture also runs inside async tests; keep its MCP event loop off that thread.
+        # Keep this synchronous fixture safe when called from an async test.
         with ThreadPoolExecutor(max_workers=1) as pool:
             pool.submit(asyncio.run, wait_for_mcp(env["MCP_SERVER_URL"], deadline)).result()
         yield env
@@ -147,8 +160,9 @@ def runtime():
         fixture.shutdown()
         fixture.server_close()
         worker.join(5)
+        assert not worker.is_alive()
         assert all(proc.poll() is not None for proc in processes)
-        for used in [mcp_port, agent_port]:
+        for used in [fixture.server_port, mcp_port, agent_port]:
             with socket.socket() as sock:
                 assert sock.connect_ex(("127.0.0.1", used)) != 0
 
@@ -228,8 +242,9 @@ def test_runtime_waits_for_mcp_when_agent_card_is_already_ready(monkeypatch, tmp
     assert not errors
 
 
-def test_fixture_records_reach_completed_a2a_artifact():
-    with runtime() as env:
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+def test_fixture_records_reach_completed_a2a_artifact(encoding):
+    with runtime(encoding) as env:
         task = send_message(env)
         assert task["status"]["state"] == "TASK_STATE_COMPLETED"
         answer = chr(10).join(
@@ -252,23 +267,81 @@ def test_fixture_records_reach_completed_a2a_artifact():
         assert all(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
 
 
-@pytest.mark.parametrize("behavior", ["slow", "failure"])
-def test_timeout_and_backend_failure_produce_failed_a2a_tasks(behavior):
-    with runtime() as env:
-        Fixture.behavior = behavior
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+@pytest.mark.parametrize("failure", ["failure", "oversized"])
+def test_backend_failure_produces_safe_failed_task_and_recovers(encoding, failure):
+    with runtime(encoding) as env:
+        Fixture.behavior = failure
         task = send_message(env)
         assert any(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
-        if behavior == "slow":
-            assert Fixture.started.is_set()
         assert task["status"]["state"] == "TASK_STATE_FAILED"
         result = json.dumps(task)
         assert "synthetic-key" not in result
         assert "/service" not in result
         assert "Fixture Released" not in result
+        Fixture.behavior = "normal"
+        recovered = send_message(env)
+        assert recovered["status"]["state"] == "TASK_STATE_COMPLETED"
+        answer = json.dumps(recovered["artifacts"])
+        assert "Fixture Released" in answer
+        assert "Fixture inspection" in answer
+        assert "Partially Confirmed" not in answer
 
 
-async def test_discovery_completes_while_http_fetch_is_blocked():
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+def test_documented_data_smoke_compares_http_records_and_recovers(encoding):
+    with runtime(encoding) as env:
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve().parents[1] / "scripts" / "smoke_data.py"),
+            "--base-url",
+            env["URL"],
+            "--order-id",
+            ORDER,
+        ]
+        for behavior in ["normal", "failure", "normal"]:
+            Fixture.behavior = behavior
+            process = subprocess.run(
+                command, env=env, capture_output=True, text=True, timeout=15, check=False
+            )
+            if behavior == "failure":
+                assert process.returncode == 1
+                assert process.stdout == ""
+                assert "Data smoke failed (RuntimeError)" in process.stderr
+            else:
+                assert process.returncode == 0
+                assert json.loads(process.stdout) == {
+                    "status_records": 1,
+                    "operation_records": 1,
+                    "state": "TASK_STATE_COMPLETED",
+                    "reply_matches_backend": True,
+                }
+                assert process.stderr == ""
+            for marker in ["synthetic-key", "/service", "Fixture Released", "Fixture inspection"]:
+                assert marker not in process.stdout + process.stderr
+
+
+def test_timeout_produces_safe_failed_a2a_task_and_recovers():
     with runtime() as env:
+        Fixture.behavior = "slow"
+        task = send_message(env)
+        assert any(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
+        assert Fixture.started.is_set()
+        assert task["status"]["state"] == "TASK_STATE_FAILED"
+        result = json.dumps(task)
+        assert "synthetic-key" not in result
+        assert "/service" not in result
+        assert "Fixture Released" not in result
+        Fixture.behavior = "normal"
+        Fixture.release.set()
+        recovered = send_message(env)
+        assert recovered["status"]["state"] == "TASK_STATE_COMPLETED"
+        assert "Fixture Released" in json.dumps(recovered["artifacts"])
+
+
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+async def test_discovery_completes_while_http_fetch_is_blocked(encoding):
+    with runtime(encoding) as env:
         Fixture.behavior = "slow"
         async with sse_client(env["MCP_SERVER_URL"]) as streams, ClientSession(*streams) as session:
             await session.initialize()

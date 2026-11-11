@@ -156,6 +156,10 @@ change does not establish production readiness.
 
 ## Use the public SAP S/4HANA sandbox
 
+Follow the [connect-data recipe](../../recipes/optional/connect-data/) for the
+local production-order path and a repeatable comparison with backend records.
+The recipe uses the existing connector and keeps the model provider in mock mode.
+
 The workshop's pro-code path used organizer-managed runtime credentials rather
 than asking each participant to obtain them. For this self-contained sample,
 obtain your own free SAP Business Accelerator Hub API key:
@@ -324,8 +328,8 @@ Its default is 20 seconds. Its allowed range is greater than zero and at most 12
 
 ## S/4 transport limits
 
-The S/4 client rejects response bodies larger than one MiB.
-It requests identity encoding and rejects compressed responses before it reads their bodies.
+The S/4 client requests identity encoding and accepts identity, gzip, and zlib-wrapped deflate.
+Transferred and decoded bytes each have a one-MiB limit, with bounded decompression allocation.
 It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
 The MCP process omits endpoint addresses from HTTP transport logs.
 
@@ -337,3 +341,13 @@ The chart keeps one agent replica and prevents overlapping replicas during upgra
 Its default services stay inside the cluster and provide no application authentication.
 Approve image publication, deployment, optional public exposure, and cleanup separately.
 This path does not deploy toolkit-generated projects or configure live data, model providers, HANA, or Joule.
+
+## S/4 transport limits
+
+The S/4 client limits both transferred and decoded response bodies to one MiB.
+It requests identity encoding, but also accepts gzip and zlib-wrapped deflate if
+an intermediary compresses the response. Decoding stops as soon as either limit
+is exceeded. Unsupported encodings and malformed or truncated compression fail
+with a safe diagnostic, and the response stream closes.
+It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
+The MCP process omits endpoint addresses from HTTP transport logs.
