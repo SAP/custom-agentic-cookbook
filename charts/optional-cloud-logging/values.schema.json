@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled",
+    "namespace",
+    "releaseName",
+    "ownershipConfirmed",
+    "telemetryModuleVersion",
+    "backendSecret"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "namespace": {
+      "type": "string",
+      "maxLength": 63,
+      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "releaseName": {
+      "type": "string",
+      "maxLength": 53,
+      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "ownershipConfirmed": {
+      "type": "boolean"
+    },
+    "telemetryModuleVersion": {
+      "type": "string",
+      "pattern": "^$|^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "backendSecret": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "endpointKey",
+        "certificateKey",
+        "privateKeyKey"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "endpointKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "certificateKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "privateKeyKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        }
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "enabled": {
+        "const": true
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "maxLength": 63,
+        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+      },
+      "releaseName": {
+        "type": "string",
+        "maxLength": 53,
+        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+      },
+      "ownershipConfirmed": {
+        "const": true
+      },
+      "telemetryModuleVersion": {
+        "minLength": 1
+      },
+      "backendSecret": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          }
+        }
+      }
+    }
+  }
+}

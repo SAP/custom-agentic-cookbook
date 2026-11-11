@@ -1,0 +1,84 @@
+{{- include "optional-cloud-logging.validate" . -}}
+{{- if .Values.enabled -}}
+{{- range $signal, $kind := dict "logs" "LogPipeline" "traces" "TracePipeline" "metrics" "MetricPipeline" -}}
+{{- $name := include "optional-cloud-logging.name" (dict "root" $ "signal" $signal) -}}
+{{- $existing := lookup "telemetry.kyma-project.io/v1beta1" $kind "" $name -}}
+{{- include "optional-cloud-logging.assertOwned" (dict "root" $ "existing" $existing) -}}
+---
+apiVersion: telemetry.kyma-project.io/v1beta1
+kind: {{ $kind }}
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: optional-cloud-logging
+    app.kubernetes.io/instance: {{ $.Release.Name | quote }}
+    app.kubernetes.io/managed-by: Helm
+    cookbook.sap.com/integration: optional-cloud-logging
+  annotations:
+    meta.helm.sh/release-name: {{ $.Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ $.Release.Namespace | quote }}
+    cookbook.sap.com/telemetry-scope: {{ include "optional-cloud-logging.scope" $ | quote }}
+spec:
+  {{- if ne $signal "traces" }}
+  input:
+    otlp:
+      enabled: true
+      namespaces:
+        include: [{{ $.Values.namespace | quote }}]
+    runtime:
+      enabled: false
+    {{- if eq $signal "metrics" }}
+    prometheus:
+      enabled: false
+    istio:
+      enabled: false
+    {{- end }}
+  {{- end }}
+  output:
+    {{- include "optional-cloud-logging.output" $ | nindent 4 }}
+  # Kyma transforms before filters. Keep all three scope keys unchanged.
+  transform:
+    - statements:
+        - 'keep_keys(resource.attributes, ["service.name", "k8s.namespace.name", "cookbook.telemetry.scope"])'
+        - 'set(resource.schema_url, "")'
+        - 'keep_keys(instrumentation_scope.attributes, [])'
+        - 'set(instrumentation_scope.version, "")'
+        - 'set(instrumentation_scope.schema_url, "")'
+    {{- if eq $signal "logs" }}
+    - statements:
+        - 'keep_keys(log.attributes, ["outcome", "tool.name", "event.name"])'
+        - 'set(log.severity_text, "")'
+    {{- else if eq $signal "traces" }}
+    - statements:
+        - 'keep_keys(span.attributes, ["outcome", "tool.name", "event.name"])'
+        - 'set(span.status.message, "")'
+    {{- else }}
+    - statements:
+        - 'keep_keys(datapoint.attributes, ["outcome"])'
+        - 'set(metric.description, "")'
+    {{- end }}
+  filter:
+    - conditions:
+        - 'resource.attributes["service.name"] == nil or resource.attributes["service.name"] != "production-order-agent"'
+        - {{ printf "resource.attributes[\"k8s.namespace.name\"] == nil or resource.attributes[\"k8s.namespace.name\"] != %s" (toJson $.Values.namespace) | quote }}
+        - {{ printf "resource.attributes[\"cookbook.telemetry.scope\"] == nil or resource.attributes[\"cookbook.telemetry.scope\"] != %s" (toJson (include "optional-cloud-logging.scope" $)) | quote }}
+        - 'instrumentation_scope.name != "production_order_agent"'
+        {{- if eq $signal "logs" }}
+        - 'log.body != "request.completed" and log.body != "tool.completed"'
+        - 'log.attributes["outcome"] != "success" and log.attributes["outcome"] != "error" and log.attributes["outcome"] != "declined"'
+        - 'log.attributes["tool.name"] != nil and log.attributes["tool.name"] != "get_production_order_status" and log.attributes["tool.name"] != "get_production_order_operations"'
+        - 'log.attributes["event.name"] != nil and log.attributes["event.name"] != "request.completed" and log.attributes["event.name"] != "tool.completed"'
+        {{- else if eq $signal "traces" }}
+        - 'span.name != "production_order.request" and span.name != "get_production_order_status" and span.name != "get_production_order_operations"'
+        - 'span.attributes["outcome"] != "success" and span.attributes["outcome"] != "error" and span.attributes["outcome"] != "declined"'
+        - 'span.attributes["tool.name"] != nil and span.attributes["tool.name"] != "get_production_order_status" and span.attributes["tool.name"] != "get_production_order_operations"'
+        - 'span.attributes["event.name"] != nil and span.attributes["event.name"] != "request.completed" and span.attributes["event.name"] != "tool.completed"'
+        - 'Len(span.events) > 0 or Len(span.links) > 0'
+        {{- else }}
+        - 'metric.name != "production_order.requests" and metric.name != "production_order.duration"'
+        - 'metric.name == "production_order.requests" and metric.unit != ""'
+        - 'metric.name == "production_order.duration" and metric.unit != "s"'
+        - 'datapoint.attributes["outcome"] != "success" and datapoint.attributes["outcome"] != "error" and datapoint.attributes["outcome"] != "declined"'
+        {{- end }}
+{{ end }}
+{{- end -}}
