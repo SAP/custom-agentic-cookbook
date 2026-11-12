@@ -1,0 +1,8 @@
+{
+  "version": "v3.5.6",
+  "commit": "c2b1e3017e2cec86b122172e861dcd026453ae44",
+  "manifest_url": "https://raw.githubusercontent.com/argoproj/argo-cd/c2b1e3017e2cec86b122172e861dcd026453ae44/manifests/install.yaml",
+  "sha256": "846c644bc81ce5557dd9048757a9c7353378f25c5eb811c77d32a9e907823599",
+  "namespace": "argocd",
+  "scope": "Review input only. Full installation includes CRDs and cluster RBAC. Use only a dedicated approved test cluster."
+}
