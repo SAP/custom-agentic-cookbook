@@ -44,6 +44,8 @@ def port():
 
 
 class Fixture(BaseHTTPRequestHandler):
+    started = threading.Event()
+    release = threading.Event()
     behavior = "normal"
     encoding = "identity"
     paths = []
@@ -54,6 +56,9 @@ class Fixture(BaseHTTPRequestHandler):
     def do_GET(self):
         type(self).paths.append(self.path)
         assert self.headers.get("APIKey") == "synthetic-key"
+        if type(self).behavior == "slow":
+            type(self).started.set()
+            type(self).release.wait(5)
         status = 503 if type(self).behavior == "failure" else 200
         data = STATUSES if "to_ProductionOrderStatus" in self.path else OPERATIONS
         body = json.dumps({"d": {"results": data}}).encode()
@@ -94,6 +99,8 @@ def runtime(encoding="identity"):
     Fixture.behavior = "normal"
     Fixture.encoding = encoding
     Fixture.paths = []
+    Fixture.started.clear()
+    Fixture.release.clear()
     fixture = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
     worker = threading.Thread(target=fixture.serve_forever, daemon=True)
     worker.start()
@@ -110,6 +117,7 @@ def runtime(encoding="identity"):
         "HOST": "127.0.0.1",
         "URL": f"http://127.0.0.1:{agent_port}",
         "MCP_SERVER_URL": f"http://127.0.0.1:{mcp_port}/sse",
+        "S4_REQUEST_TIMEOUT_SECONDS": "0.8",
     }
     processes = []
     try:
@@ -140,6 +148,7 @@ def runtime(encoding="identity"):
             pool.submit(asyncio.run, wait_for_mcp(env["MCP_SERVER_URL"], deadline)).result()
         yield env
     finally:
+        Fixture.release.set()
         for proc in processes:
             proc.terminate()
         for proc in processes:
@@ -310,3 +319,42 @@ def test_documented_data_smoke_compares_http_records_and_recovers(encoding):
                 assert process.stderr == ""
             for marker in ["synthetic-key", "/service", "Fixture Released", "Fixture inspection"]:
                 assert marker not in process.stdout + process.stderr
+
+
+def test_timeout_produces_safe_failed_a2a_task_and_recovers():
+    with runtime() as env:
+        Fixture.behavior = "slow"
+        task = send_message(env)
+        assert any(f"A_ProductionOrder_2('{ORDER}')" in path for path in Fixture.paths)
+        assert Fixture.started.is_set()
+        assert task["status"]["state"] == "TASK_STATE_FAILED"
+        result = json.dumps(task)
+        assert "synthetic-key" not in result
+        assert "/service" not in result
+        assert "Fixture Released" not in result
+        Fixture.behavior = "normal"
+        Fixture.release.set()
+        recovered = send_message(env)
+        assert recovered["status"]["state"] == "TASK_STATE_COMPLETED"
+        assert "Fixture Released" in json.dumps(recovered["artifacts"])
+
+
+@pytest.mark.parametrize("encoding", ["identity", "gzip", "deflate"])
+async def test_discovery_completes_while_http_fetch_is_blocked(encoding):
+    with runtime(encoding) as env:
+        Fixture.behavior = "slow"
+        async with sse_client(env["MCP_SERVER_URL"]) as streams, ClientSession(*streams) as session:
+            await session.initialize()
+            request = asyncio.create_task(
+                session.call_tool("get_production_order_status", {"manufacturing_order": ORDER})
+            )
+            try:
+                async with asyncio.timeout(3):
+                    while not Fixture.started.is_set():
+                        await asyncio.sleep(0.01)
+                    tools = await asyncio.wait_for(session.list_tools(), 0.5)
+                    assert len(tools.tools) == 2
+                    assert not request.done()
+            finally:
+                Fixture.release.set()
+            assert not (await request).isError

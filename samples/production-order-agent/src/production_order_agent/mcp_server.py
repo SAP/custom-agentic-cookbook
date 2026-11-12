@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import logging
@@ -133,6 +134,7 @@ class S4Repository:
         api_key: str,
         *,
         transport: httpx.BaseTransport | None = None,
+        timeout: float = 20,
     ) -> None:
         if not base_url.strip():
             raise RuntimeError("S4_BASE_URL is required when DATA_MODE=s4")
@@ -141,6 +143,9 @@ class S4Repository:
         self.base_url = base_url.rstrip("/") + "/"
         self.api_key = api_key
         self.transport = transport
+        if not 0 < timeout <= 120:
+            raise ValueError("S4_REQUEST_TIMEOUT_SECONDS must be greater than 0 and at most 120")
+        self.timeout = timeout
 
     def fetch(self, manufacturing_order: str, navigation: str) -> list[dict[str, Any]]:
         try:
@@ -152,7 +157,7 @@ class S4Repository:
                         "Accept": "application/json",
                         "Accept-Encoding": "identity",
                     },
-                    timeout=20,
+                    timeout=self.timeout,
                     transport=self.transport,
                     trust_env=False,
                 ) as client,
@@ -192,6 +197,7 @@ def _fetch(manufacturing_order: str, field: str, navigation: str) -> list[dict[s
         repository = S4Repository(
             os.getenv("S4_BASE_URL", DEFAULT_S4_BASE_URL),
             os.getenv("S4_API_KEY", ""),
+            timeout=float(os.getenv("S4_REQUEST_TIMEOUT_SECONDS", "20")),
         )
         return repository.fetch(manufacturing_order, navigation)
     raise RuntimeError("DATA_MODE must be 'mock' or 's4'")
@@ -207,20 +213,22 @@ def create_mcp_server() -> FastMCP:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     @server.tool()
-    def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:
+    async def get_production_order_status(manufacturing_order: str) -> list[dict[str, Any]]:
         """Return active status records for an SAP S/4HANA production order."""
 
-        return _fetch(
+        return await asyncio.to_thread(
+            _fetch,
             manufacturing_order,
             "status",
             "to_ProductionOrderStatus",
         )
 
     @server.tool()
-    def get_production_order_operations(manufacturing_order: str) -> list[dict[str, Any]]:
+    async def get_production_order_operations(manufacturing_order: str) -> list[dict[str, Any]]:
         """Return scheduled operations for an SAP S/4HANA production order."""
 
-        return _fetch(
+        return await asyncio.to_thread(
+            _fetch,
             manufacturing_order,
             "operations",
             "to_ProductionOrderOperation",
