@@ -1,0 +1,6 @@
+schema_version: 1.4.0
+name: production_order_demo
+capabilities:
+  - type: local
+    name: production_order_agent_a2a
+    folder: ./

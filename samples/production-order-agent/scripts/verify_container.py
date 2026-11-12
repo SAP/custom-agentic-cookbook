@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import httpx
 from smoke_a2a import business_reply
+from smoke_joule import legacy_business_reply
 
 
 def docker(*arguments: str, timeout: int = 90) -> str:
@@ -134,12 +135,7 @@ def run(image: str, mode: str) -> dict:
                         ) from None
                     time.sleep(0.25)
             if mode == "joule":
-                legacy = send(client, base, legacy=True)
-                task = legacy.get("result", {})
-                if task.get("status", {}).get("state") != "completed":
-                    raise RuntimeError("v0.3 task did not complete")
-                task["status"]["state"] = "TASK_STATE_COMPLETED"
-                business_reply({"result": {"task": task}})
+                legacy_business_reply(send(client, base, legacy=True))
                 results["v03_and_v1"] = True
             for name in names:
                 controls = json.loads(
@@ -166,33 +162,41 @@ def run(image: str, mode: str) -> dict:
                 if json.loads(docker("inspect", mcp))[0]["HostConfig"]["PortBindings"]:
                     raise RuntimeError("MCP must have no published port")
                 docker("stop", "--time", "15", mcp)
-                failed = send(client, base, legacy=mode == "joule")
-                task = failed.get("result", {})
-                state = (
-                    task.get("status", {}).get("state")
-                    if mode == "joule"
-                    else (task.get("task", {}).get("status", {}).get("state"))
-                )
-                if state not in ("failed", "TASK_STATE_FAILED"):
-                    raise RuntimeError("backend loss did not return a failed A2A task")
-                if mode != "joule":
-                    task = task.get("task", {})
-                artifacts = task.get("artifacts", [])
-                if len(artifacts) != 1 or artifacts[0].get("name") != "error":
-                    raise RuntimeError("backend loss did not return only the error artifact")
-                if "The production-order data could not be retrieved." not in json.dumps(artifacts):
-                    raise RuntimeError("backend loss did not return the safe error message")
+                failures = {}
+                for legacy in (False, True) if mode == "joule" else (False,):
+                    failed = send(client, base, legacy=legacy)
+                    task = failed.get("result", {})
+                    if not legacy:
+                        task = task.get("task", {})
+                    expected_state = "failed" if legacy else "TASK_STATE_FAILED"
+                    if task.get("status", {}).get("state") != expected_state:
+                        raise RuntimeError("backend loss did not return a failed A2A task")
+                    artifacts = task.get("artifacts", [])
+                    if len(artifacts) != 1 or artifacts[0].get("name") != "error":
+                        raise RuntimeError("backend loss did not return only the error artifact")
+                    if "The production-order data could not be retrieved." not in json.dumps(
+                        artifacts
+                    ):
+                        raise RuntimeError("backend loss did not return the safe error message")
+                    failures["0.3.0" if legacy else "1.0"] = True
+                results["backend_failure_protocols"] = failures
                 results["backend_failure"] = True
                 results["safe_error_artifact"] = True
                 docker("start", mcp)
                 deadline = time.monotonic() + 30
                 while True:
                     try:
-                        restored = business_reply(send(client, base))
-                        if restored != results["reply"]:
-                            raise RuntimeError(
-                                "restored backend returned a different business reply"
+                        for legacy in (False, True) if mode == "joule" else (False,):
+                            payload = send(client, base, legacy=legacy)
+                            restored = (
+                                legacy_business_reply(payload)
+                                if legacy
+                                else business_reply(payload)
                             )
+                            if restored != results["reply"]:
+                                raise RuntimeError(
+                                    "restored backend returned a different business reply"
+                                )
                         results["restored_success"] = True
                         break
                     except (httpx.HTTPError, RuntimeError):
@@ -223,7 +227,7 @@ def run(image: str, mode: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True)
-    parser.add_argument("--mode", choices=["split"], default="split")
+    parser.add_argument("--mode", choices=["split", "joule"], default="split")
     args = parser.parse_args()
     print(json.dumps(run(args.image, args.mode), indent=2))
 

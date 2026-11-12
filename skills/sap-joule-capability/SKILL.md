@@ -1,107 +1,78 @@
 ---
 name: sap-joule-capability
-description: Use this skill when authoring `.sapdas.yaml` capability bundles to register a code-based agent into Joule. Covers the four bundle files (capability, _da, scenarios, functions), the `joule.ext` namespace rules, daar packaging, and the three integration paths (direct A2A, BPA-async, multi-agent front-door).
+description: Prepare the experimental single-turn production-order DTA bundle for Customer-Managed Joule, with explicit A2A v0.3 compatibility and separate compiler, auth, runtime and cleanup gates.
 ---
 
-# Joule Capability Bundles — wire a code agent into Joule
+# Customer-Managed Joule capability bundle
 
-To make a code-based A2A agent callable from Joule, ship a `joule-capability/` directory containing four kinds of `.sapdas.yaml` files. Joule consumes them via the Joule CLI (`joule deploy`).
+Use the [single-turn bundle](../../samples/production-order-agent/joule-capability/) and
+[recipe 03](../../recipes/03-joule/). The full checkpoint remains partial.
+CMJ means Customer-Managed Joule. DTA means design-time artifact.
+DA means digital assistant. The bundle contains DTA files for a DA.
 
-## Bundle layout
+Do not assume a toolkit-generated bundle or provision a tenant.
+Do not substitute SAP-Managed Joule or Work CLI behavior for this CMJ DTA path.
+The selected tenant and tools must support this specific path.
 
-```
-joule-capability/
-├── capability.sapdas.yaml         # who is this agent, where is its Agent Card
-├── _da.sapdas.yaml                # which conversational surfaces it can appear in
-├── scenarios/
-│   └── default.sapdas.yaml        # intents → functions
-└── functions/
-    └── <name>.sapdas.yaml         # each function maps to an A2A skill id
-```
+## Public starter contract
 
-## `capability.sapdas.yaml`
+Run the production-order sample with `--joule-v03` to enable the SDK's v0.3 adapter and legacy card.
+Without it, the v1-only default remains.
+Both versions share the existing business and MCP implementation and in-memory task store.
+The change adds no inbound authentication, streaming, push, or multi-turn capability.
+The legacy card advertises v0.3. The current v1 card and `SendMessage` remain available.
 
-```yaml
-apiVersion: joule.ext/v1
-kind: Capability
-metadata:
-  name: my-first-agent
-spec:
-  agentCardUrl: https://my-first-agent.<your-cf-domain>/.well-known/agent.json
-  authMode: oauth2-client-credentials      # OR `ias` for prod
-  scenarios: [default]
-```
+## Four files and resolution
 
-## `_da.sapdas.yaml` (Digital Assistant binding)
+The bundle contains these files:
 
-```yaml
-apiVersion: joule.ext/v1
-kind: DigitalAssistant
-metadata: { name: my-first-agent-da }
-spec:
-  surfaces: [joule-code-editor, joule-sidebar-erp]
-  capabilityRef: my-first-agent
-```
+- `da.sapdas.yaml`: One local capability folder with DA schema 1.4.0
+- `capability.sapdas.yaml`: DTA 3.28.0, namespace and name, and alias map for the destination
+- `functions/call_agent.yaml`: Remote `agent-request`, current utterance, and safe reply
+- `scenarios/invoke_agent.yaml`: Production-order intent that selects `call_agent`
 
-## `scenarios/<name>.sapdas.yaml`
+The function name selects its filename.
+The system alias selects the exact destination name.
+The Agent Card skill ID is metadata, not a function endpoint.
+This single-turn path requires no context or task file.
+Before use, make sure that the namespace, names, descriptor, and schemas pass the selected tenant and tool policy.
 
-```yaml
-apiVersion: joule.ext/v1
-kind: Scenario
-metadata: { name: default }
-spec:
-  intents: ["@my-first-agent *"]
-  fallback: true
-  functions: [echo]
-```
+The bundle adapts structure from the Apache-2.0 public
+[toolkit reference at 7d284bd6](https://github.com/SAP-samples/joule-a2a-agent-toolkit/blob/7d284bd6d6e83f2ce9e3bf164689adc9db9ad4f1/skills/joule-a2a-agent/references/joule-capability.md).
+It does not port the toolkit.
+It does not claim toolkit scaffold or runtime parity.
 
-## `functions/<name>.sapdas.yaml`
+## Response boundary
 
-```yaml
-apiVersion: joule.ext/v1
-kind: Function
-metadata: { name: echo }
-spec:
-  description: "Echo what the user said"
-  examples: ["say PONG"]
-  a2aSkillId: echo            # matches AgentSkill(id="echo") in agent_executor.py
-```
+An artifact is data that a task returns.
+Local v0.3 HTTP returns task state `completed`, a first `production-order-summary`
+artifact, and a first `kind: text` part.
+The answer is in artifact text. `status.message` is absent.
+The function assumes that Joule places this task in `agent_result.body`.
+That response wrapper remains unproven in Joule.
 
-## Deploying
+Use official [getSafe/orElse](https://help.sap.com/docs/JOULE/ba88d1ec6a1b442098863d577c19b0c0/a96708519552494cbaef4ab81bf94a21.html?version=CLOUD)
+for missing keys and indexes.
+Accept only the selected completed state, artifact name, text kind, and nonempty text.
+Do not guess wrappers or use collection expressions without test evidence.
+Actual Joule evaluation must test wrong types, empty or whitespace text, failed tasks,
+protocol errors, and transport timeout behavior.
+Keep raw responses, credentials, task IDs, and backend errors out of text for the user.
+Static parsing does not prove expression behavior.
 
-```bash
-joule login
-joule deploy ./joule-capability
-joule list capabilities | grep my-first-agent
-```
+## Platform and release gates
 
-## Three integration paths
+The path requires these gates:
 
-| Path | When | How |
-|------|------|-----|
-| 1: Direct A2A | one agent, sync, < 60s | `authMode: oauth2-client-credentials`, agent on CF/Kyma — quickstart Step 06 |
-| 2: BPA-async | long-running | Capability targets a BPA process; agent does work, callback to BPA |
-| 3: Multi-agent front-door (proxy) | many agents, central IAS | Capability targets the proxy URL; proxy fans out — planned, no vendored template yet. Not the same as [SwissKnife](https://github.com/SAP-samples/btp-joule-a2a-pro-code-agent) (single full A2A agent, not a proxy); see [`references/btp-joule-a2a-pro-code-agent/`](../../references/btp-joule-a2a-pro-code-agent/). |
+- An existing CMJ tenant with selected namespace, roles, IAS access, and HTTPS endpoint
+- An authenticated HTTPS endpoint and an OAuth2 client-credentials destination before compiler upload, with MCP kept private
+- External legacy `@sap/joule-studio-cli@1.5.21` with compatible Node and package license
+- Separate approval before `joule compile`, which uploads files and creates an authenticated remote job
+- Separate deployment approval, actual CMJ action evaluation, and a visible answer from the tools within 60 seconds
+- Exact capability and destination ownership with separate cleanup approval
 
-## Region availability
-
-Joule itself is not GA in every region — run [`recipes/00-develop/00-region-preflight/`](../../recipes/00-develop/00-region-preflight/) before promising a customer.
-
-## Pitfalls
-
-- `agentCardUrl` blocked by auth → Joule can't discover. Always make `/.well-known/agent.json` public.
-- `a2aSkillId` mismatch → Joule registers the function but invocation returns 404. Compare to your agent's `AgentSkill(id=...)`.
-- Missing `scenarios` or empty intents → Joule registers the capability but won't route.
-
-## Verify
-
-```bash
-joule list capabilities | grep -E "<name>.+ACTIVE"
-joule invoke --capability <name> --text "say PONG"
-# expect: response containing PONG
-```
-
-## Cross-references
-
-- Joule capability bundles live inside the agent template. The `references/a2a-agent-cap/` slot (TODO — see [`references/README.md`](../../references/README.md)) will ship the canonical CAP bundle; until then, use the public reference at [`references/btp-joule-a2a-pro-code-agent/`](../../references/btp-joule-a2a-pro-code-agent/).
-- Walkthrough: [`recipes/01-deploy/01-wire-into-joule/`](../../recipes/01-deploy/01-wire-into-joule/)
+Do not vendor the CLI or install or update it globally as part of this skill.
+Use [BYOA](https://help.sap.com/docs/JOULE/ba88d1ec6a1b442098863d577c19b0c0/2f9701e60fd24e948c2c74fe9e55ce23.html?version=CLOUD)
+as the protocol source.
+CLI and UI authentication do not prove authentication for requests from Joule to the agent.
+Record compiler, runtime, and cleanup proof separately before marking the checkpoint complete.

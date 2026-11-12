@@ -1,0 +1,7 @@
+description: >
+  Call this agent when the user asks about a numeric production or manufacturing
+  order, its status, scheduled operations, or potential delay. For example,
+  "Why is production order 1000000 delayed?" or "Show operations for order 1000000".
+target:
+  type: function
+  name: call_agent

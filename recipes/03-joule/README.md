@@ -1,211 +1,140 @@
 ---
-title: "Wire an A2A agent into Joule"
-sap-services: [Joule, Destination Service, XSUAA, Joule Studio CLI]
-region-availability:
-  - region: commercial
-    works: yes
-    note: "GA in eu10; rolling out elsewhere. Verify DTA schema 3.28.0+"
-  - region: china
-    works: no
-    note: "Joule control plane not in cn40 as of 2026-06-29. Use UI5 chat shell + Build Work Zone tile fallback."
-  - region: ns2
-    works: no
-    note: "Joule not GA in NS2 boundary. Ship a custom UI shell."
-  - region: ksa
-    works: limited
-    note: "Joule rollout trails CF runtime GA. Verify per tenant."
+title: "Connect the production-order agent to Customer-Managed Joule"
+sap-services: [Joule, Destination Service]
 complexity: recipe
-last-validated: 2026-06-29
-changes-under-baip: "Joule capability YAML schema may evolve; DTA → BAIP capability model. The `agent-request` action stays."
+status: partial
 ---
 
-# 03 · Wire into Joule
+# 03 · Customer-Managed Joule
 
-> **Guided:** checkpoint 3 — the last step, only where Joule is available in the region. Mid-flow prompt: *"Wire my deployed agent into Joule."*
-> **Flow:** terminal step of the happy path — consumes the deployed URL from **[02-deploy-btp](../02-deploy-btp/)**.
-> **Input:** the deployed `<agent>` URL and Agent Card from **02-deploy-btp** (its Output), plus BTP roles `extensibility_developer` + `capabilityadmin` and a working `joule-studio-cli`.
-> **Output:** a Terraform-managed BTP HTTP destination named `<ALIAS_NAME>` pointing at the deployed URL **plus** a deployed Joule capability bundle (`joule-capability/da.sapdas.yaml`) that surfaces the agent inside Joule.
-> **Automation:** `infra/btp/scripts/joule-destination.sh` creates the native destination; `joule deploy --compile` publishes the capability bundle. The toolkit command remains an alternative for subaccounts not managed by Terraform.
+Status: partial. This recipe supplies a single-turn bundle and locally tested A2A v0.3 compatibility.
+Compiler upload, Joule action evaluation, endpoint authentication, a visible Joule answer,
+and cleanup remain unproven.
 
-> ⚠ Region: Joule BYOA + A2A v0.3.0 + DTA schema 3.28.0+ is GA in eu10; rolling out elsewhere; NOT GA in cn40 / NS2 / ksa-non-regulated. For sovereign regions, use the UI5 chat shell fallback (recipe TODO).
-> Plugin profile: `genai-hub`
-> LLM provider: `aicore`
-> Persistence: any
+The input is the public [production-order starter](../../samples/production-order-agent/)
+and its selected HTTPS endpoint from [recipe 02](../02-deploy-btp/).
+Use an existing Customer-Managed Joule (CMJ) tenant and synthetic mock data first.
+This recipe does not provision Joule, IAS, BTP services, or a new account.
+SAP-Managed Joule, plugin scaffolding, push notifications, and multi-turn paths are separate work.
 
-## When to use it
-
-The customer's region has Joule with DTA schema 3.28.0+ AND the customer wants their agent surfaced inside the Joule consumer experience.
+DTA means design-time artifact. DA means digital assistant.
+The bundle contains DTA files that a compiler prepares for deployment to a DA.
+An artifact is data that an A2A task returns.
 
 ## Prerequisites
 
-- Agent already deployed ([01-scaffold-agent](../01-scaffold-agent/) — optionally [optional/connect-data](../optional/connect-data/) — then [02-deploy-btp](../02-deploy-btp/))
-- BTP roles: `extensibility_developer` + `capabilityadmin`
-- Joule Studio CLI: `npm install -g @sap/joule-studio-cli` (note: `@sap/joule-cli` 404s; use `@sap/joule-studio-cli`)
-- `joule login` succeeded (the App2App IAS flow must be configured — see [Troubleshooting](#troubleshooting))
-- BTP Destination service available in the region
+The path needs these resources:
 
-## Scaffold
+- An owner-approved existing IAS/Joule association eligible for this CMJ path, with BYOA support and DTA schema 3.28.0 or later
+- Evidence that the selected operator already has the required Manage Applications authorization
+- The tenant's required deployment roles, namespace policy, and IAS App2App CLI access from its administrator
+- A reachable HTTPS agent endpoint and an agreed authentication mechanism
+- Node.js for legacy `@sap/joule-studio-cli@1.5.21`, which accepts Node 20.12 through 24
 
-The plugin generates the `joule-capability/` folder when you scaffold with the default `genai-hub` profile.
+[Regional preflight](../optional/region-preflight/) supplies catalog context.
+Make sure that the selected tenant has Joule availability and enablement separately.
+AI Core and CF are not unconditional prerequisites.
+Either selected deployment runtime can supply an endpoint.
+Its protocol and authentication must pass tests.
 
-## Configure
+## Local protocol test
 
-### Log in to the Joule tenant
+Follow the [bundle README](../../samples/production-order-agent/joule-capability/) to start the existing mock MCP server.
+Run the agent with `--joule-v03` and send a real HTTP v0.3 message.
+The option enables the SDK adapter and legacy Agent Card.
+Without the option, v1 remains the default.
+The test requires a completed manufacturing-order artifact from both MCP tools.
+After testing, stop both local processes.
 
-For a new account, bootstrap Cloud Identity Services, trust, and Joule from the
-Terraform directory first:
+Current CMJ [BYOA](https://help.sap.com/docs/JOULE/ba88d1ec6a1b442098863d577c19b0c0/2f9701e60fd24e948c2c74fe9e55ce23.html?version=CLOUD)
+constructs A2A v0.3.0 JSON-RPC `message/send`.
+It expects a synchronous response within 60 seconds.
+The mock test does not prove the deployed or model deadline.
 
-```bash
-cd infra/btp
-./scripts/joule-bootstrap.sh --apply \
-  --var-file=terraform.tfvars \
-  --var-file=profiles/joule-studio.tfvars.example
-```
+## Select the destination and bundle
 
-If SAP creates a new identity tenant, activate its initial administrator from
-SAP's email and run the identical command again. The helper discovers the IAS
-hostname and resumes with trust and Joule provisioning; no hostname needs to be
-copied into a variable file.
+The four files in [joule-capability](../../samples/production-order-agent/joule-capability/)
+include a DA descriptor, capability alias map, function, and production-order intent scenario.
+The alias `ProductionOrderAgent` maps to destination `COOKBOOK_PRODUCTION_ORDER_A2A`.
+Review the example DA and capability names and `joule.ext` namespace for the selected tenant.
+Update references consistently. The path assumes no fifth context file or toolkit-generated folder.
 
-For shared or production operation, use the separately locked foundation,
-identity, and Joule roots in [`infra/btp/stacks`](../../infra/btp/stacks/README.md)
-instead of extending the legacy single state. After each stage, run
-`infra/btp/scripts/status.sh` for the consolidated readiness report.
+After separate creation approval, create one HTTP destination manually in the existing CMJ subaccount.
+Point it to the chosen HTTPS agent base URL.
+Match its name exactly to the alias map.
+The sample and development charts provide no endpoint authentication.
+Prepare an authenticated HTTPS endpoint before compiler upload.
+Use `OAuth2ClientCredentials` for the destination.
+The destination token grant, issuer, audience, scope, and card access path must match.
+Test a rejected unauthenticated request and a successful authenticated business request.
+Do not publish MCP. CLI login and Joule UI login do not prove agent endpoint authentication.
 
-When the tenant was provisioned with `infra/btp`, run the repository helper:
+## Compiler and deployment gate
 
-```bash
-cd infra/btp
-./scripts/joule-login.sh
-```
+Use external legacy CLI `@sap/joule-studio-cli@1.5.21`.
+Before installation, make sure that its package license and Node requirements permit your isolated tool environment.
+Do not vendor the CLI.
+Newer releases have a different Node and Work CLI surface.
+They are not implicitly compatible with this candidate.
+See [official installation](https://help.sap.com/docs/JOULE/ba88d1ec6a1b442098863d577c19b0c0/5270f042bdb2459fa2875e241ebae2e7.html?version=CLOUD)
+and [authentication](https://help.sap.com/docs/JOULE/ba88d1ec6a1b442098863d577c19b0c0/5853b3509b8747a3ad832d94e55507fd.html?version=CLOUD).
 
-If the `joule-cli` service binding has not been created yet, make that mutation
-explicit on the first run:
+Complete interactive SSO in your own terminal.
+Keep secrets and authentication state outside Git and chat.
+Some IAS applications require `app_tid`.
+Do not copy a value from another tenant or guess it.
 
-```bash
-./scripts/joule-login.sh --create-binding
-```
+`joule compile` uploads the bundle and creates an authenticated remote compiler job.
+It is not a local schema test.
+Before running it, obtain separate authorization for the upload and selected target.
+YAML parsing or the packaged DA schema can test local structure.
+They cannot establish function or capability compilation.
+Inspect compile output and the resulting artifact for private values.
+Deployment is another live mutation and requires its own approval.
 
-The script derives the Joule API URL from Terraform, reads the binding secret
-directly from BTP into memory, and invokes `joule login --sso-passcode`. It does
-not print or persist the binding credentials. The temporary authentication code
-is entered through the prompt opened by the CLI.
-
-The destination ALIAS must match `system_aliases.<AliasName>.destination` in
-`joule-capability/capability.sapdas.yaml`.
-
-> ℹ Two YAMLs, two jobs: `capability.sapdas.yaml` holds the capability metadata and system aliases; `da.sapdas.yaml` is the top-level deployment descriptor you pass to `joule deploy` in the Deploy step below. Both are generated into `joule-capability/` by the scaffold.
-
-#### Terraform (default for Terraform-managed subaccounts)
-
-From `infra/btp`, resolve the deployed CF app route and create the native BTP
-destination:
-
-```bash
-./scripts/joule-destination.sh \
-  --agent-name <agent-name> \
-  --destination-name <ALIAS_NAME> \
-  --var-file=terraform.tfvars \
-  --var-file=profiles/agent.tfvars.example \
-  --var-file=profiles/joule-studio.tfvars.example \
-  --apply
-```
-
-For Kyma or an explicitly selected route, replace `--agent-name` with
-`--agent-url=https://<PUBLIC_AGENT_HOST>`. Terraform owns subsequent updates and
-deletion. Authentication is fixed to `NoAuthentication`; the wrapper never
-creates a Destination service key or stores credentials.
-
-#### Toolkit alternatives for non-Terraform subaccounts
-
-The older plugin, MCP, and shell drivers remain available when Terraform does
-not own the subaccount destination. Do not mix them with the Terraform resource
-for the same destination name.
-
-##### Claude Code plugin
-
-```bash
-/sap-a2a-agent-toolkit:create-destination <agent-name> <ALIAS_NAME> <landscape>
-```
-
-##### MCP server
-
-Ask the assistant something like:
-
-> Use the sap-a2a-toolkit MCP to create a BTP destination named `<ALIAS_NAME>` pointing at the deployed CF app `<agent-name>` in landscape `<landscape>`.
-
-Build with `./scripts/build-toolkit-mcp.sh`, then configure the harness to spawn
-the absolute `scripts/start-toolkit-mcp.sh` path. Setup:
-[`docs/harnesses.md`](../../docs/harnesses.md).
-
-##### Standalone shell script
-
-```bash
-bash toolkits/a2a-agent-toolkit/skills/joule-a2a-agent/scripts/create-destination.sh \
-  --agent-name <agent-name> \
-  --destination-name <ALIAS_NAME> \
-  --landscape <landscape>
-```
-
-Reference: `SCRIPTS.md` §6 (in the A2A Agent Toolkit plugin).
-
-> ℹ `joule deploy` is **not** wrapped by any driver. Run it directly against `joule-capability/` — see the Deploy step below.
-
-## Deploy
-
-```bash
-cd <agent-name>/joule-capability
-joule deploy ./da.sapdas.yaml --compile -n "<assistant_name>"
-```
+The function assumes that `agent-request` exposes the v0.3 task under `agent_result.body`.
+This response wrapper contains the task. Local HTTP does not establish Joule's wrapper.
+The expressions select only the completed first `production-order-summary` text artifact.
+They do not guess other wrappers.
+Actual Joule evaluation must establish behavior for missing values, wrong types, and empty text.
+It must also establish whether actions continue after a transport error.
 
 ## Verify it works
 
-```bash
-curl -s https://<agent-route>/.well-known/agent.json | jq .name
-# expect: agent card
+After separate compile and deployment approvals, open the selected CMJ UI.
+Ask “Why is production order 1000000 delayed?”
+Require the visible expected status, operations, and potential delay for operation 0020.
+Make sure that a real A2A request reached the agent.
+Make sure that both private MCP tools supplied data.
+Capture sanitized evidence for the action wrapper, response conditions, backend failures, and selected endpoint authentication.
 
-# Then in the Joule UI, send a prompt that matches the capability scenario description.
-# Inspect cf logs to confirm the A2A task arrived.
-cf logs <agent-name> --recent | grep "task received"
-```
-
-## Troubleshooting
-
-- `Schema version defined in config file is greater than the current schema version of Joule` → tenant DTA schema is too old. Request a Joule service update.
-- `namespace validation error` → `metadata.namespace` must be `joule.ext`.
-- 401 from Joule → re-run `joule login`; verify `extensibility_developer` + `capabilityadmin` roles.
-- `joule login` fails → the App2App IAS flow isn't configured for Joule Studio CLI on the subaccount. Follow the [role-assignment guide](https://help.sap.com/docs/joule/integrating-joule-with-sap/assign-roles) — a one-time IAS admin action, not something the toolkit can auto-provision.
-- `joule list`, `compile`, or `deploy` returns HTTP 401/403 → use the [`sap-repair-joule-access`](../../skills/sap-repair-joule-access/SKILL.md) diagnostic skill. It distinguishes a stale token from a missing Terraform assignment without driving the interactive passcode prompt.
+A login, successful compile or deployment, capability listing, healthy app, or Agent Card alone does not complete this checkpoint.
+Keep local protocol proof, compiler proof, the visible Joule answer, and cleanup proof separate.
+Record each result against the selected source and environment.
 
 ## Cleanup or rollback
 
+After cleanup approval, remove only this added local capability from the selected DA.
+Use the pinned CLI's documented command:
+
 ```bash
-joule undeploy <capability-id>
+joule remove "<DA_NAME>" --capability "<NAMESPACE>:<CAPABILITY_NAME>"
 ```
 
-## Region-specific notes
+See [official removal](https://help.sap.com/docs/JOULE/ba88d1ec6a1b442098863d577c19b0c0/3fa5325ef29246da9b4ddc4ea54eafe0.html?version=CLOUD).
+Remove or restore only the destination owned by this test.
+Make sure that it no longer routes.
+Make sure that pre-existing DA capabilities, users, tenant, and services remain.
+Endpoint and sample teardown follow the selected deployment recipe.
 
-- **eu10:** happy path, GA.
-- **eu11 / us10 / us20 / us21 / jp10 / ap10 / ap11:** rolling out; verify per tenant.
-- **China (cn40):** NO. Use UI5 chat shell + Build Work Zone tile instead.
-- **NS2:** NO. Ship a custom UI shell.
-- **KSA non-regulated:** NO. Use UI5 chat shell.
-- **KSA regulated:** verify per tenant; AI Core is available so the prerequisites can be met.
 
-## Related skills
+## Native response-validation gap
 
-For UI work alongside this recipe, install these skills from <https://skills.cloud.sap/>:
-
-- `sap-fiori-guidelines` — Fiori design system + AI/Joule UI patterns
-- `ui5-best-practices-integration-cards` — Joule cards rendered from agent output
-- `accessibility` — UI5 a11y APIs
-- `styling` — UI5 Web Components theming
-
-## Source
-
-- Discovery Center (Joule listing per region) — confirm with the [region preflight](../optional/region-preflight/).
-- `skills/joule-a2a-agent/references/joule-capability.md` (in the A2A Agent Toolkit plugin)
-
-### Further reading
-
-- Felix Bartler (SAP), [**Joule A2A: Connect Code Based Agents into Joule**](https://community.sap.com/t5/technology-blog-posts-by-sap/joule-a2a-connect-code-based-agents-into-joule/ba-p/14329279) — SAP community blog (2026-02-16). Canonical SAP-authored walkthrough that this recipe operationalizes: LangGraph ReAct agent on CF, A2A protocol, `capability.sapdas.yaml` + `joule.ext` namespace, `agent-request` action, destination wiring, `joule deploy -c -n "<bot_name>"`. Example repo: [`fyx99/joule-pro-code-a2a`](https://github.com/fyx99/joule-pro-code-a2a).
+The current `answer_text != ''` expression does not independently reject a
+whitespace-only string. Actual Joule evaluation must cover space, tab/newline,
+U+2003, null, list, map, Boolean and numeric text values, as well as missing
+fields and transport failures. A local Python contract or YAML parse cannot
+prove the selected Joule runtime's type handling, Unicode checks, response
+wrapper or continuation after transport errors. Keep these cases as open
+native acceptance requirements; do not assume that a trim-only change clears
+them. The current bundle is an experimental proposal for native validation.

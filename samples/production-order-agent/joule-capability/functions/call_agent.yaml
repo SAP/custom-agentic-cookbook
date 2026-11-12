@@ -1,0 +1,40 @@
+# Assumes agent-request exposes the unwrapped v0.3 task under agent_result.body.
+# This wrapper and the expressions require actual Joule runtime validation.
+action_groups:
+  - actions:
+      - type: set-variables
+        variables:
+          - name: reply
+            value: The production-order agent did not return a completed text answer.
+      - type: status-update
+        message: Checking the production order.
+      - type: agent-request
+        agent_type: remote
+        system_alias: ProductionOrderAgent
+        result_variable: agent_result
+      - type: set-variables
+        scripting_type: spel
+        variables:
+          - name: task_kind
+            value: "<? agent_result.getSafe('body').getSafe('kind').orElse('') ?>"
+          - name: task_state
+            value: "<? agent_result.getSafe('body').getSafe('status').getSafe('state').orElse('') ?>"
+          - name: artifact_name
+            value: "<? agent_result.getSafe('body').getSafe('artifacts').getSafe(0).getSafe('name').orElse('') ?>"
+          - name: part_kind
+            value: "<? agent_result.getSafe('body').getSafe('artifacts').getSafe(0).getSafe('parts').getSafe(0).getSafe('kind').orElse('') ?>"
+          - name: answer_text
+            value: "<? agent_result.getSafe('body').getSafe('artifacts').getSafe(0).getSafe('parts').getSafe(0).getSafe('text').orElse('') ?>"
+  - condition: task_kind == 'task' && task_state == 'completed' && artifact_name == 'production-order-summary' && part_kind == 'text' && answer_text != ''
+    actions:
+      - type: set-variables
+        scripting_type: spel
+        variables:
+          - name: reply
+            value: "<? answer_text ?>"
+  - actions:
+      - type: message
+        message:
+          type: text
+          content: "<? reply ?>"
+          markdown: true

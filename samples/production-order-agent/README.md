@@ -301,7 +301,7 @@ dependency advisory. Assess the full dependency graph before deployment.
 ## Boundaries
 
 - Local, Compose, and experimental existing-cluster Kyma mock execution
-- No Cloud Foundry or Joule deployment assets in this sample
+- No Cloud Foundry deployment assets; Joule remains an experimental partial path
 - In-memory A2A task state
 - No authentication on the A2A or MCP endpoints
 - Read-only production-order tools
@@ -326,3 +326,19 @@ is exceeded. Unsupported encodings and malformed or truncated compression fail
 with a safe diagnostic, and the response stream closes.
 It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
 The MCP process omits endpoint addresses from HTTP transport logs.
+
+## Experimental single-turn Customer-Managed Joule
+
+The [single-turn DTA bundle](joule-capability/) adds explicit A2A v0.3
+compatibility to this same agent. Start it with `--joule-v03` and run
+`scripts/smoke_joule.py` against its loopback URL. The default stays v1-only;
+the opt-in preserves v1 `SendMessage` and both cards. Both protocols use the
+same production-order tools and in-memory task state.
+
+The [Joule recipe](../../recipes/03-joule/) covers the bundle, destination,
+compiler and cleanup gates. An existing eligible tenant, operator permissions,
+authenticated HTTPS endpoint and matching OAuth2 destination are required.
+Local mock tests establish protocol behavior only. Actual Joule compilation,
+action response handling, visible business answer and tenant cleanup remain
+unproven. Do not expose the unauthenticated development agent or its MCP
+service as a production Joule endpoint.

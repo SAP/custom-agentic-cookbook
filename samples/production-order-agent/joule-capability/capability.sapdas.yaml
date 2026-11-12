@@ -1,0 +1,10 @@
+schema_version: 3.28.0
+metadata:
+  namespace: joule.ext
+  name: production_order_agent_a2a
+  version: 1.0.0
+  display_name: Production Order Agent
+  description: Returns production-order status, operations, and potential delays.
+system_aliases:
+  ProductionOrderAgent:
+    destination: COOKBOOK_PRODUCTION_ORDER_A2A

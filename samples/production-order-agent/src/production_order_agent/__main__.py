@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 
 import uvicorn
+from a2a.compat.v0_3.conversions import to_compat_agent_card
 from a2a.helpers import new_task_from_user_message
 from a2a.helpers.proto_helpers import new_text_part
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -14,6 +16,9 @@ from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
 from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 from production_order_agent.agent import ProductionOrderAgent
 from production_order_agent.settings import Settings
@@ -106,8 +111,22 @@ def create_app(
     base_url: str = "http://127.0.0.1:8000",
     *,
     agent: ProductionOrderAgent | None = None,
+    joule_v03: bool = False,
 ) -> Starlette:
     agent_card = build_agent_card(base_url)
+    card_routes = create_agent_card_routes(agent_card)
+    if joule_v03:
+        agent_card.supported_interfaces.append(
+            AgentInterface(url=base_url, protocol_binding="JSONRPC", protocol_version="0.3.0")
+        )
+        legacy_card = to_compat_agent_card(agent_card).model_dump(
+            mode="json", by_alias=True, exclude_none=True
+        )
+
+        async def get_legacy_card(_: Request) -> JSONResponse:
+            return JSONResponse(legacy_card)
+
+        card_routes.append(Route("/.well-known/agent.json", get_legacy_card, methods=["GET"]))
     request_handler = DefaultRequestHandler(
         agent_executor=ProductionOrderAgentExecutor(agent),
         task_store=InMemoryTaskStore(),
@@ -115,21 +134,26 @@ def create_app(
     )
     return Starlette(
         routes=[
-            *create_agent_card_routes(agent_card),
+            *card_routes,
             *create_jsonrpc_routes(
                 request_handler=request_handler,
                 rpc_url="/",
-                enable_v0_3_compat=False,
+                enable_v0_3_compat=joule_v03,
             ),
         ]
     )
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Run the production-order A2A sample.")
+    parser.add_argument(
+        "--joule-v03", action="store_true", help="Enable experimental CMJ A2A v0.3 compatibility."
+    )
+    args = parser.parse_args()
     settings = Settings.from_env()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     uvicorn.run(
-        app=create_app(settings.url),
+        app=create_app(settings.url, joule_v03=args.joule_v03),
         host=settings.host,
         port=settings.port,
     )
