@@ -1,0 +1,9 @@
+image:
+  repository: ""
+  digest: ""
+imagePullSecret: ""
+backend: fixture
+existingSecret: ""
+schema: ""
+graph: ""
+embeddingDimension: ""

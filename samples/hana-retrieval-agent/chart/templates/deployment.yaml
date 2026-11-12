@@ -1,0 +1,82 @@
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $digest := required "image.digest is required" .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) -}}
+{{- fail "image.digest must be a sha256 digest" -}}
+{{- end -}}
+{{- if not (has .Values.backend (list "fixture" "hana")) -}}
+{{- fail "backend must be fixture or hana" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: {{ .Release.Name }}}
+  template:
+    metadata:
+      labels: {app: {{ .Release.Name }}}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets: [{name: {{ .Values.imagePullSecret | quote }}}]
+      {{- end }}
+      containers:
+        {{- range $name := list "agent" "mcp" }}
+        - name: {{ $name }}
+          image: {{ printf "%s@%s" $repository $digest | quote }}
+          command: [python, -m, {{ ternary "hana_retrieval" "hana_retrieval.mcp_server" (eq $name "agent") | quote }}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          env:
+            - {name: HOST, value: "0.0.0.0"}
+            {{- if eq $name "agent" }}
+            - {name: URL, value: {{ printf "http://%s.%s.svc.cluster.local:8000" $.Release.Name $.Release.Namespace | quote }}}
+            {{- end }}
+            - {name: MCP_HOST, value: "127.0.0.1"}
+            - {name: MCP_SERVER_URL, value: "http://127.0.0.1:8092/sse"}
+            - {name: RETRIEVAL_BACKEND, value: {{ $.Values.backend | quote }}}
+            {{- if eq $.Values.backend "hana" }}
+            - {name: HANA_SCHEMA, value: {{ required "schema is required for hana" $.Values.schema | quote }}}
+            - {name: HANA_GRAPH, value: {{ required "graph is required for hana" $.Values.graph | quote }}}
+            - {name: EMBEDDING_DIMENSION, value: {{ required "embeddingDimension is required for hana" $.Values.embeddingDimension | quote }}}
+          {{- if eq $name "mcp" }}
+          envFrom:
+            - secretRef: {name: {{ required "existingSecret is required for hana" $.Values.existingSecret | quote }}}
+          {{- end }}
+            {{- end }}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+          {{- if eq $name "agent" }}
+          ports: [{name: http, containerPort: 8000}]
+          readinessProbe:
+            httpGet: {path: /.well-known/agent-card.json, port: http}
+          {{- else }}
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import socket; socket.create_connection(('127.0.0.1', 8092), timeout=1).close()"
+          {{- end }}
+        {{- end }}
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  selector: {app: {{ .Release.Name }}}
+  ports: [{name: http, port: 8000, targetPort: http}]
