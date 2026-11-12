@@ -154,6 +154,18 @@ ensurepip backup, and retains its operating-system package inventory for scannin
 Assess the complete image and Python dependencies before deployment; a base
 change does not establish production readiness.
 
+## Prepare the Cloud Foundry mock package
+
+The experimental [Cloud Foundry package](deploy/cf/) runs both existing modules
+inside one app container. Its launcher keeps MCP on loopback, fixes both
+providers to mock mode, and stops both processes if either fails. The package
+contains a separate Dockerfile, a no-route manifest, and local verification
+instructions. It targets an existing approved Cloud Foundry org and space.
+
+Local container tests verify the business reply and process cleanup. They do
+not prove managed Cloud Foundry deployment, route behavior, or live cleanup.
+The package does not consume the sandbox or AI Core options below.
+
 ## Use the public SAP S/4HANA sandbox
 
 Follow the [connect-data recipe](../../recipes/optional/connect-data/) for the
@@ -301,7 +313,9 @@ dependency advisory. Assess the full dependency graph before deployment.
 ## Boundaries
 
 - Local, Compose, and experimental existing-cluster Kyma mock execution
-- No Cloud Foundry or Joule deployment assets in this sample
+- Experimental existing-target [Cloud Foundry mock packaging](deploy/cf/);
+  managed deployment, business reply, and cleanup remain unvalidated
+- No Joule deployment assets in this sample
 - In-memory A2A task state
 - No authentication on the A2A or MCP endpoints
 - Read-only production-order tools
