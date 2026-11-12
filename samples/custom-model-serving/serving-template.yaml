@@ -1,0 +1,47 @@
+apiVersion: ai.sap.com/v1alpha1
+kind: ServingTemplate
+metadata:
+  name: cookbook-qwen-small
+  annotations:
+    scenarios.ai.sap.com/name: Cookbook custom model
+    scenarios.ai.sap.com/description: CPU Qwen2.5 1.5B custom inference
+    executables.ai.sap.com/name: cookbook-qwen-small
+    executables.ai.sap.com/description: Pinned model and llama.cpp CPU serving image
+  labels:
+    scenarios.ai.sap.com/id: cookbook-custom-model
+    ai.sap.com/version: "0.1.0"
+spec:
+  template:
+    apiVersion: serving.kserve.io/v1beta1
+    metadata:
+      annotations: |
+        autoscaling.knative.dev/metric: concurrency
+        autoscaling.knative.dev/target: 1
+        autoscaling.knative.dev/targetBurstCapacity: 0
+      labels: |
+        ai.sap.com/resourcePlan: infer.s
+    spec: |
+      predictor:
+        minReplicas: 1
+        maxReplicas: 1
+        imagePullSecrets:
+          - name: REPLACE_WITH_EXISTING_REGISTRY_SECRET
+        containers:
+          - name: kserve-container
+            image: REPLACE_WITH_REVIEWED_IMAGE_DIGEST
+            ports:
+              - containerPort: 8080
+                protocol: TCP
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 10001
+              runAsGroup: 10001
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: [ALL]
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 8080
+              initialDelaySeconds: 5
+              periodSeconds: 10

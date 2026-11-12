@@ -326,3 +326,18 @@ is exceeded. Unsupported encodings and malformed or truncated compression fail
 with a safe diagnostic, and the response stream closes.
 It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
 The MCP process omits endpoint addresses from HTTP transport logs.
+
+## Optional custom AI Core model
+
+Select LLM_PROVIDER=aicore-custom and MODEL_NAME=qwen2.5:1.5b for the separate custom-model consumer.
+Build this consumer with `Dockerfile.model-consumer`, as shown in the
+[custom-model recipe](../../recipes/optional/bring-your-own-model/#custom-deployment-consumer).
+Its frozen base dependencies include the OAuth-aware HTTP client; the optional
+SAP foundation-model SDK is required only for `LLM_PROVIDER=aicore`.
+Supply its selected deployment URL, OAuth token URL, client credentials, and resource group through a private environment.
+The consumer acquires a fresh token per summary, retries one inference HTTP 401, and closes each HTTP client.
+It sends at most 200 records per tool and 64 KiB of business data.
+A provider failure produces a failed A2A task without mock fallback.
+For Compose, select `compose.custom-model.yaml` explicitly alongside `compose.yaml`;
+the default stack retains its fixed mock provider.
+See the [custom-model recipe](../../recipes/optional/bring-your-own-model/) and [serving sample](../custom-model-serving/) for the local image test, live gates, and cleanup.

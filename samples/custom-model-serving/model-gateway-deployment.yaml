@@ -1,0 +1,100 @@
+# Replace every placeholder in an ignored copy before deployment review.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cookbook-gateway-consumer
+  namespace: REPLACE_WITH_TEST_NAMESPACE
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: cookbook-gateway-consumer}
+  template:
+    metadata:
+      labels: {app: cookbook-gateway-consumer}
+    spec:
+      imagePullSecrets:
+        - name: REPLACE_WITH_EXISTING_REGISTRY_SECRET
+      containers:
+        - name: agent
+          image: REPLACE_WITH_REVIEWED_GATEWAY_AGENT_IMAGE_DIGEST
+          env:
+            - {name: LLM_PROVIDER, value: openai-compatible}
+            - {name: MODEL_NAME, value: "qwen2.5:1.5b"}
+            - {name: HOST, value: "0.0.0.0"}
+            - {name: PORT, value: "8000"}
+            - {name: URL, value: "http://cookbook-gateway-consumer:8000"}
+            - {name: MCP_SERVER_URL, value: "http://127.0.0.1:8090/sse"}
+            - {name: MODEL_GATEWAY_URL, value: "http://127.0.0.1:8081/v1"}
+            - name: MODEL_GATEWAY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: REPLACE_WITH_EXISTING_GATEWAY_TOKEN_SECRET
+                  key: model-gateway-token
+          ports:
+            - {containerPort: 8000}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            httpGet: {path: /.well-known/agent-card.json, port: 8000}
+        - name: mcp
+          image: REPLACE_WITH_REVIEWED_GATEWAY_AGENT_IMAGE_DIGEST
+          command: [python, -m, production_order_agent.mcp_server]
+          env:
+            - {name: DATA_MODE, value: mock}
+            - {name: MCP_HOST, value: "127.0.0.1"}
+            - {name: MCP_PORT, value: "8090"}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 256Mi}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+        - name: model-bridge
+          image: REPLACE_WITH_REVIEWED_MODEL_CONSUMER_IMAGE_DIGEST
+          command: [python, -m, production_order_agent.model_bridge]
+          envFrom:
+            - secretRef:
+                name: REPLACE_WITH_EXISTING_CUSTOM_MODEL_SECRET
+          env:
+            - {name: MODEL_NAME, value: "qwen2.5:1.5b"}
+            - {name: MODEL_GATEWAY_HOST, value: "127.0.0.1"}
+            - {name: MODEL_GATEWAY_PORT, value: "8081"}
+            - name: MODEL_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: REPLACE_WITH_EXISTING_GATEWAY_TOKEN_SECRET
+                  key: model-gateway-token
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            exec:
+              command: [python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=2).close()"]
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cookbook-gateway-consumer
+  namespace: REPLACE_WITH_TEST_NAMESPACE
+spec:
+  type: ClusterIP
+  selector: {app: cookbook-gateway-consumer}
+  ports:
+    - {port: 8000, targetPort: 8000}
