@@ -305,7 +305,7 @@ dependency advisory. Assess the full dependency graph before deployment.
 - In-memory A2A task state
 - No authentication on the A2A or MCP endpoints
 - Read-only production-order tools
-- No RAG, SAP-RPT-1, UI, or observability stack
+- No RAG, SAP-RPT-1, or UI; application telemetry is optional
 - A date-based delay signal, not a production scheduling decision
 
 ## Deploy the mock sample to Kyma
@@ -326,3 +326,64 @@ is exceeded. Unsupported encodings and malformed or truncated compression fail
 with a safe diagnostic, and the response stream closes.
 It ignores ambient proxy variables and returns safe errors for timeouts, failed requests, and malformed OData.
 The MCP process omits endpoint addresses from HTTP transport logs.
+
+## Optional application telemetry
+
+Telemetry is disabled by default. The normal mock run needs no telemetry packages or export endpoint.
+The optional bridge emits one request span, two MCP client tool spans, fixed application logs, and request metrics.
+It does not instrument the model provider or the MCP server process.
+It does not claim distributed server spans or GenAI token metrics.
+
+Install the locked optional extra in the sample directory:
+
+```bash
+uv sync --frozen --extra telemetry
+```
+
+The separate SDK-free `Dockerfile.telemetry` installs the frozen telemetry extra.
+Build it from the sample directory:
+
+```bash
+docker build -f Dockerfile.telemetry -t production-order-agent:telemetry .
+```
+
+Telemetry remains disabled in this image until you select `TELEMETRY_MODE=otlp`.
+
+For a local test, select a loopback OTLP receiver that you control.
+For Kyma, obtain separate approval for telemetry egress and use the reviewed integration configuration.
+Set these four environment inputs before starting the agent:
+
+```text
+TELEMETRY_MODE=otlp
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
+TELEMETRY_NAMESPACE=synthetic
+TELEMETRY_SCOPE=synthetic-signals
+```
+
+Use an HTTP base endpoint with no path, query, credentials, or fragment.
+The bridge sends HTTP/protobuf to `/v1/traces`, `/v1/logs`, and `/v1/metrics`.
+For Kyma, use the namespace and scope marker from the reviewed integration chart.
+Both marker inputs must be DNS labels of at most 63 characters.
+A scope marker selects telemetry. It is not an authentication credential.
+
+The bridge rejects other `OTEL_EXPORTER_OTLP_*` inputs because exporters can consume ambient headers and certificates.
+It ignores proxy and netrc credentials and does not discover host, tenant, user, or resource identities.
+Exported fields contain fixed signal names, outcome, duration, routing marker, namespace, and trace correlation.
+Prompt bodies, order IDs, business records, raw exceptions, and endpoint URLs are excluded.
+Metric labels contain only outcome. Metric exemplars link a duration to its request trace.
+
+Set `TELEMETRY_MODE=disabled` and restart to stop application export.
+The same business path remains available without optional packages.
+The Starlette lifespan owns provider startup, flush, and shutdown.
+Exporter failures do not replace the business reply.
+Owned SDK diagnostic log records use fixed text while telemetry is active.
+The bridge restores those logger filters after the final application stops.
+
+Run component tests with:
+
+```bash
+uv run --frozen --extra telemetry pytest -q tests/test_telemetry.py
+```
+
+These tests prove local signal behavior and privacy. They do not prove delivery to SAP Cloud Logging.
+The complete Cloud Logging recipe still needs reviewed pipelines, an approved Kyma run, disable proof, and exact cleanup.

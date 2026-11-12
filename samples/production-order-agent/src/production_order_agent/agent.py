@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
@@ -11,6 +12,7 @@ from typing import Any
 
 from production_order_agent.mcp_client import call_mcp_tool
 from production_order_agent.settings import Settings
+from production_order_agent.telemetry import decline_request
 
 ToolCaller = Callable[[str, str, str], Awaitable[list[dict[str, Any]]]]
 Summarizer = Callable[
@@ -157,6 +159,9 @@ async def summarize_with_aicore(
             "AI Core support is not installed; run 'uv sync --extra aicore'"
         ) from exc
 
+    # The native SDK uses HTTPX2; its completed-request logs include deployment URLs.
+    for name in ("httpx2", "httpcore2"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     client = AsyncOpenAI()
     response = await client.chat.completions.create(
         model=model_name,
@@ -207,6 +212,7 @@ class ProductionOrderAgent:
     async def invoke(self, text: str) -> str:
         manufacturing_order = extract_order_id(text)
         if manufacturing_order is None:
+            decline_request()
             return "Please provide one unambiguous numeric manufacturing order ID."
 
         statuses, operations = await asyncio.gather(

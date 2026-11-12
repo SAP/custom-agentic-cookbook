@@ -8,6 +8,8 @@ from typing import Any
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
+from production_order_agent.telemetry import tool_span
+
 ALLOWED_TOOLS = {
     "get_production_order_operations",
     "get_production_order_status",
@@ -63,14 +65,15 @@ async def call_mcp_tool(
     if not server_url.strip():
         raise ValueError("MCP_SERVER_URL is required")
 
-    async with (
-        sse_client(server_url) as (read_stream, write_stream),
-        ClientSession(read_stream, write_stream) as session,
-    ):
-        await session.initialize()
-        result = await session.call_tool(
-            tool_name,
-            arguments={"manufacturing_order": manufacturing_order},
-        )
+    with tool_span(tool_name):
+        async with (
+            sse_client(server_url) as (read_stream, write_stream),
+            ClientSession(read_stream, write_stream) as session,
+        ):
+            await session.initialize()
+            result = await session.call_tool(
+                tool_name,
+                arguments={"manufacturing_order": manufacturing_order},
+            )
 
-    return tool_result_data(result)
+        return tool_result_data(result)
