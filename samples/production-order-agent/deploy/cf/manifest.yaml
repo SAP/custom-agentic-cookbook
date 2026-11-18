@@ -1,0 +1,15 @@
+applications:
+  - name: REPLACE_WITH_NEW_TEST_APP
+    instances: 1
+    memory: 512M
+    disk_quota: 1G
+    no-route: true
+    docker:
+      image: REPLACE_WITH_REGISTRY_IMAGE_AT_SHA256_DIGEST
+    health-check-type: http
+    health-check-http-endpoint: /.well-known/agent-card.json
+    timeout: 180
+    env:
+      URL: REPLACE_WITH_APPROVED_ADVERTISED_AGENT_URL
+      DATA_MODE: mock
+      LLM_PROVIDER: mock

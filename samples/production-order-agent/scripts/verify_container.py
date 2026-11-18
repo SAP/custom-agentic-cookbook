@@ -47,7 +47,9 @@ def send(client: httpx.Client, base: str, *, legacy: bool = False) -> dict:
     return response.json()
 
 
-def run(image: str, mode: str) -> dict:
+def run(image: str, mode: str, fail_child: str | None = None) -> dict:
+    if fail_child and mode != "cf":
+        raise ValueError("--fail-child requires --mode cf")
     if not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
         raise ValueError("--image must be the immutable local image ID from docker image inspect")
     metadata = json.loads(docker("image", "inspect", image))[0]
@@ -199,9 +201,45 @@ def run(image: str, mode: str) -> dict:
                         if time.monotonic() >= deadline:
                             raise RuntimeError("restored backend did not recover") from None
                         time.sleep(0.25)
-        docker("stop", "--time", "15", agent)
-        if mode == "cf" and int(docker("inspect", "--format", "{{.State.ExitCode}}", agent)):
-            raise RuntimeError("CF launcher did not stop gracefully")
+        if mode == "cf":
+            loopback = docker(
+                "exec",
+                agent,
+                "python",
+                "-c",
+                "from pathlib import Path; "
+                "rows=[r.split() for r in Path('/proc/net/tcp').read_text().splitlines()[1:]]; "
+                "print(all(r[1]=='0100007F:1F9A' for r in rows "
+                "if r[1].endswith(':1F9A') and r[3]=='0A') "
+                "and any(r[1]=='0100007F:1F9A' and r[3]=='0A' for r in rows))",
+            )
+            if loopback != "True":
+                raise RuntimeError("CF MCP listener did not stay on loopback")
+            results["mcp_loopback"] = True
+        if fail_child:
+            module = (
+                "production_order_agent.mcp_server"
+                if fail_child == "mcp"
+                else "production_order_agent"
+            )
+            docker(
+                "exec",
+                agent,
+                "python",
+                "-c",
+                "import os,signal; from pathlib import Path; "
+                f"pids=[int(p.parent.name) for p in Path('/proc').glob('[0-9]*/cmdline') "
+                f"if p.read_bytes().split(bytes([0]))[1:3]==[b'-m', {module.encode()!r}]]; "
+                "assert len(pids)==1; os.kill(pids[0],signal.SIGKILL)",
+            )
+            docker("wait", agent, timeout=30)
+            if int(docker("inspect", "--format", "{{.State.ExitCode}}", agent)) != 1:
+                raise RuntimeError("child loss did not fail the CF container")
+            results["child_failure"] = fail_child
+        else:
+            docker("stop", "--time", "15", agent)
+            if mode == "cf" and int(docker("inspect", "--format", "{{.State.ExitCode}}", agent)):
+                raise RuntimeError("CF launcher did not stop gracefully")
         results["process_restrictions"] = True
     finally:
         for name in reversed(names):
@@ -223,9 +261,10 @@ def run(image: str, mode: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True)
-    parser.add_argument("--mode", choices=["split"], default="split")
+    parser.add_argument("--mode", choices=["split", "cf"], default="split")
+    parser.add_argument("--fail-child", choices=["agent", "mcp"])
     args = parser.parse_args()
-    print(json.dumps(run(args.image, args.mode), indent=2))
+    print(json.dumps(run(args.image, args.mode, args.fail_child), indent=2))
 
 
 if __name__ == "__main__":
