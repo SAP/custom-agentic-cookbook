@@ -1,0 +1,4 @@
+apiVersion: v2
+name: hana-retrieval-agent
+version: 0.1.0
+type: application

@@ -1,0 +1,25 @@
+services:
+  agent:
+    platform: linux/amd64
+    build: .
+    image: cookbook-hana-retrieval:local
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      MCP_SERVER_URL: http://mcp:8092/sse
+      HOST: 0.0.0.0
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  mcp:
+    platform: linux/amd64
+    build: .
+    image: cookbook-hana-retrieval:local
+    command: [python, -m, hana_retrieval.mcp_server]
+    environment:
+      MCP_HOST: 0.0.0.0
+      RETRIEVAL_BACKEND: fixture
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
