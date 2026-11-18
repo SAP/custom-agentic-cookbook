@@ -104,6 +104,7 @@ Use these optional recipes when the core path needs another capability:
 
 | Recipe | Use it to |
 | --- | --- |
+| [Build with your coding assistant](recipes/optional/coding-assistant/) | Adapt a local agent with reviewed changes, real replies, and cleanup |
 | [Connect sandbox data](recipes/optional/connect-data/) | Read production-order records through the public SAP sandbox and verify the agent reply |
 | [Check regional availability](recipes/optional/region-preflight/) | Validate services in sovereign, regulated, or unfamiliar regions |
 | [Use an approved model gateway](recipes/optional/sovereign-model-gateway/) | Summarize the standalone Python sample's records with an approved OpenAI-compatible endpoint |

@@ -43,6 +43,7 @@ Deployment to an existing cluster does not require BTP provisioning automation.
 
 | Recipe | Capability | Current limitation |
 | --- | --- | --- |
+| [coding-assistant](optional/coding-assistant/) | Adapt an existing local agent | Development-time practice with a pinned mock exercise; no BTP or toolkit required. |
 | [connect-data](optional/connect-data/) | Read production-order sandbox records and compare the completed agent reply | Local Python sample only; sandbox demonstration records do not prove customer tenant access. |
 | [region-preflight](optional/region-preflight/) | Discover regional services | Requery availability before a regional deployment. |
 | [sovereign-model-gateway](optional/sovereign-model-gateway/) | Use an approved model endpoint | The checked-in Python provider passes controlled gateway tests. Live provider and deployment evidence remain separate. |
