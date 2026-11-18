@@ -1,0 +1,21 @@
+# Replace every placeholder with the reviewed repository and test namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: REPLACE_WITH_EXISTING_DELEGATED_APP_PROJECT
+  namespace: argocd
+spec:
+  description: Private production-order test workloads only
+  sourceRepos:
+    - https://github.com/REPLACE_WITH_APPROVED_OWNER/REPLACE_WITH_DEPLOY_REPOSITORY.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: REPLACE_WITH_EXISTING_DELEGATED_NAMESPACE
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+  orphanedResources:
+    warn: true

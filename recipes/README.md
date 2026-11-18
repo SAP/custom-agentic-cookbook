@@ -50,7 +50,7 @@ Deployment to an existing cluster does not require BTP provisioning automation.
 | [hana-vector-store](optional/hana-vector-store/) | Retrieve document context | Existing scoped evidence does not prove the complete public tool integration. |
 | [hana-kg-triple-store](optional/hana-kg-triple-store/) | Query graph relationships | HANA loading, tool integration, and deployment need a complete public path. |
 | [sap-cloud-logging](optional/sap-cloud-logging/) | Export logs, traces, and metrics | The public business agent needs instrumentation and deployment support. |
-| [gitops-cicd](optional/gitops-cicd/) | Deploy through Argo CD | Referenced support assets and a working rollout remain incomplete. |
+| [gitops-cicd](optional/gitops-cicd/) | Deploy the mock agent through Argo CD | Checked-in values, updater, and manual Application use the public chart. Live synchronization, business reply, rollback, and cleanup remain unverified. |
 | [observe-and-eval](optional/observe-and-eval/) | Evaluate agent behavior | The portable evaluation harness is a placeholder. |
 
 ## Prepare local architecture choices

@@ -1,0 +1,23 @@
+# Inert example. Replace every placeholder and review ownership before approval.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: production-order-gitops
+  namespace: argocd
+spec:
+  project: REPLACE_WITH_EXISTING_DELEGATED_APP_PROJECT
+  source:
+    repoURL: https://github.com/REPLACE_WITH_APPROVED_OWNER/REPLACE_WITH_DEPLOY_REPOSITORY.git
+    targetRevision: REPLACE_WITH_REVIEWED_40_CHARACTER_DEPLOY_COMMIT
+    path: charts/production-order-agent
+    helm:
+      releaseName: production-order-gitops
+      valueFiles:
+        - ../../references/gitops-production-order/deployment-values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: REPLACE_WITH_EXISTING_DELEGATED_NAMESPACE
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=false
+      - FailOnSharedResource=true
