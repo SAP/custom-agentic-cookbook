@@ -1,0 +1,10 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.model-consumer
+    environment:
+      LLM_PROVIDER: openai-compatible
+      MODEL_NAME: ${MODEL_NAME:?Set the approved gateway model name}
+      MODEL_GATEWAY_URL: ${MODEL_GATEWAY_URL:?Set the approved gateway base URL}
+      MODEL_GATEWAY_API_KEY: ${MODEL_GATEWAY_API_KEY:?Set the gateway bearer key privately}

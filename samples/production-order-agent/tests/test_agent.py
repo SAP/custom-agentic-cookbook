@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -114,3 +115,36 @@ def test_deterministic_summary_handles_no_records() -> None:
     answer = deterministic_summary("1000000", [], [])
     assert "No status records returned" in answer
     assert "No operation records returned" in answer
+
+
+@pytest.mark.asyncio
+async def test_tool_failure_does_not_leave_sibling_running_after_invoke_returns() -> None:
+    sibling_started, release_sibling, sibling_finished = (
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    failed = asyncio.Event()
+
+    async def tools(_: str, name: str, __: str) -> list[dict[str, Any]]:
+        if name.endswith("status"):
+            await sibling_started.wait()
+            failed.set()
+            raise RuntimeError("Synthetic data refusal")
+        sibling_started.set()
+        await release_sibling.wait()
+        sibling_finished.set()
+        return []
+
+    agent = ProductionOrderAgent(tool_caller=tools)
+    invocation = asyncio.create_task(agent.invoke("Show order 1000000"))
+    try:
+        await asyncio.wait_for(failed.wait(), timeout=1)
+        done, _ = await asyncio.wait({invocation}, timeout=0.01)
+        assert not done, "Failed invocation returned while sibling tool was still running"
+    finally:
+        release_sibling.set()
+        await asyncio.wait_for(sibling_finished.wait(), timeout=1)
+        with pytest.raises(RuntimeError, match="Synthetic data refusal"):
+            await invocation
+    assert sibling_finished.is_set()
