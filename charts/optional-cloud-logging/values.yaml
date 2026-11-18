@@ -1,0 +1,19 @@
+enabled: false
+
+# Explicit dedicated application namespace and separate integration Helm release.
+# They must match --namespace and the Helm release name.
+namespace: ""
+releaseName: ""
+
+# Confirm delegated administration of exactly these three cluster-scoped pipelines.
+ownershipConfirmed: false
+
+# Record the installed module version after an authorized compatibility check.
+telemetryModuleVersion: ""
+
+# Existing approved Secret in the dedicated namespace. Values are never accepted.
+backendSecret:
+  name: ""
+  endpointKey: ingest-otlp-endpoint
+  certificateKey: ingest-otlp-cert
+  privateKeyKey: ingest-otlp-key

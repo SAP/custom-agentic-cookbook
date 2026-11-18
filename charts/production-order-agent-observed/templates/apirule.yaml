@@ -1,0 +1,25 @@
+{{- if .Values.apirule.enabled }}
+{{- $host := required "apirule.host is required when apirule.enabled=true" .Values.apirule.host }}
+{{- if not .Values.apirule.noAuth }}
+{{- fail "apirule.enabled=true requires explicit apirule.noAuth=true; this development chart does not configure production authentication" }}
+{{- end }}
+apiVersion: gateway.kyma-project.io/v2
+kind: APIRule
+metadata:
+  name: {{ include "production-order-agent.fullname" . }}-agent
+  labels:
+    {{- include "production-order-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  gateway: {{ .Values.apirule.gateway | quote }}
+  hosts:
+    - {{ $host | quote }}
+  service:
+    name: {{ include "production-order-agent.fullname" . }}-agent
+    namespace: {{ .Release.Namespace }}
+    port: 8000
+  rules:
+    - path: /{**}
+      methods: [GET, POST]
+      noAuth: true
+{{- end }}

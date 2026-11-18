@@ -13,6 +13,7 @@ from typing import Any
 from production_order_agent.gateway import summarize_with_gateway
 from production_order_agent.mcp_client import call_mcp_tool
 from production_order_agent.settings import Settings
+from production_order_agent.telemetry import decline_request
 
 ToolCaller = Callable[[str, str, str], Awaitable[list[dict[str, Any]]]]
 Summarizer = Callable[
@@ -214,6 +215,7 @@ class ProductionOrderAgent:
     async def invoke(self, text: str) -> str:
         manufacturing_order = extract_order_id(text)
         if manufacturing_order is None:
+            decline_request()
             return "Please provide one unambiguous numeric manufacturing order ID."
 
         statuses, operations = await asyncio.gather(

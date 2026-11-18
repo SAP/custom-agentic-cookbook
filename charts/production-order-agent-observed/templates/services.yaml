@@ -1,0 +1,24 @@
+{{- range $component := list "agent" "mcp" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "production-order-agent.fullname" $ }}-{{ $component }}
+  labels:
+    {{- include "production-order-agent.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "production-order-agent.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+  ports:
+    - name: http
+      {{- if eq $component "agent" }}
+      port: 8000
+      {{- else }}
+      port: 8090
+      {{- end }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

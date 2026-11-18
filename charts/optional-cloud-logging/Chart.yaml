@@ -1,0 +1,6 @@
+apiVersion: v2
+name: optional-cloud-logging
+description: Opt-in, scoped OTLP pipelines for an existing SAP Cloud Logging backend.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

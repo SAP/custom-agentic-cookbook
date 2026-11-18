@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 import uvicorn
 from a2a.helpers import new_task_from_user_message
@@ -17,6 +19,7 @@ from starlette.applications import Starlette
 
 from production_order_agent.agent import ProductionOrderAgent
 from production_order_agent.settings import Settings
+from production_order_agent.telemetry import Telemetry
 
 LOGGER = logging.getLogger("production_order_agent")
 
@@ -64,39 +67,45 @@ def build_agent_card(base_url: str) -> AgentCard:
 
 
 class ProductionOrderAgentExecutor(AgentExecutor):
-    def __init__(self, agent: ProductionOrderAgent | None = None) -> None:
+    def __init__(
+        self, agent: ProductionOrderAgent | None = None, telemetry: Telemetry | None = None
+    ) -> None:
         self.agent = agent or ProductionOrderAgent()
+        self.telemetry = telemetry or Telemetry()
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        task = context.current_task
-        if task is None:
-            task = new_task_from_user_message(context.message)
-            await event_queue.enqueue_event(task)
+        with self.telemetry.request() as signal:
+            task = context.current_task
+            if task is None:
+                task = new_task_from_user_message(context.message)
+                await event_queue.enqueue_event(task)
 
-        updater = TaskUpdater(event_queue, task.id, task.context_id)
-        await updater.start_work()
-        try:
-            answer = await self.agent.invoke(context.get_user_input())
-        except Exception as exc:
-            LOGGER.warning("production-order request failed: %s", type(exc).__name__)
+            updater = TaskUpdater(event_queue, task.id, task.context_id)
+            await updater.start_work()
+            try:
+                answer = await self.agent.invoke(context.get_user_input())
+            except Exception as exc:
+                if signal is not None:
+                    signal.fail()
+                LOGGER.warning("production-order request failed: %s", type(exc).__name__)
+                await updater.add_artifact(
+                    parts=[
+                        new_text_part(
+                            "The production-order data could not be retrieved. "
+                            "Check the MCP server and its data-source configuration.",
+                            "text/plain",
+                        )
+                    ],
+                    name="error",
+                )
+                await updater.failed()
+                return
+
             await updater.add_artifact(
-                parts=[
-                    new_text_part(
-                        "The production-order data could not be retrieved. "
-                        "Check the MCP server and its data-source configuration.",
-                        "text/plain",
-                    )
-                ],
-                name="error",
+                parts=[new_text_part(answer, "text/plain")],
+                name="production-order-summary",
             )
-            await updater.failed()
-            return
-
-        await updater.add_artifact(
-            parts=[new_text_part(answer, "text/plain")],
-            name="production-order-summary",
-        )
-        await updater.complete()
+            await updater.complete()
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise NotImplementedError("Cancellation is not supported.")
@@ -106,14 +115,26 @@ def create_app(
     base_url: str = "http://127.0.0.1:8000",
     *,
     agent: ProductionOrderAgent | None = None,
+    telemetry: Telemetry | None = None,
 ) -> Starlette:
+    telemetry = telemetry or Telemetry.from_env()
+
+    @asynccontextmanager
+    async def lifespan(app):
+        try:
+            telemetry.start()
+            yield
+        finally:
+            await asyncio.to_thread(telemetry.shutdown)
+
     agent_card = build_agent_card(base_url)
     request_handler = DefaultRequestHandler(
-        agent_executor=ProductionOrderAgentExecutor(agent),
+        agent_executor=ProductionOrderAgentExecutor(agent, telemetry),
         task_store=InMemoryTaskStore(),
         agent_card=agent_card,
     )
     return Starlette(
+        lifespan=lifespan,
         routes=[
             *create_agent_card_routes(agent_card),
             *create_jsonrpc_routes(
@@ -121,7 +142,7 @@ def create_app(
                 rpc_url="/",
                 enable_v0_3_compat=False,
             ),
-        ]
+        ],
     )
 
 
